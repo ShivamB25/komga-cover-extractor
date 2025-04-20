@@ -4,7 +4,13 @@ import os
 # Import necessary constants/functions from other modules
 # Assuming config.py will define these lists/variables
 try:
-    from .config import file_formats, file_extensions, library_types, translation_source_types, source_languages
+    from .config import (
+        file_formats,
+        file_extensions,
+        library_types,
+        translation_source_types,
+        source_languages,
+    )
 except ImportError:
     print("WARN: Could not import from .config in models.py, using placeholders.")
     file_formats = ["chapter", "volume"]
@@ -17,6 +23,7 @@ except ImportError:
 
 class LibraryType:
     """Represents a type of library with specific matching criteria."""
+
     def __init__(
         self, name, extensions, must_contain, must_not_contain, match_percentage=90
     ):
@@ -27,9 +34,11 @@ class LibraryType:
         self.match_percentage = match_percentage
 
     def __str__(self):
-        return (f"LibraryType(name={self.name}, extensions={self.extensions}, "
-                f"must_contain={self.must_contain}, must_not_contain={self.must_not_contain}, "
-                f"match_percentage={self.match_percentage})")
+        return (
+            f"LibraryType(name={self.name}, extensions={self.extensions}, "
+            f"must_contain={self.must_contain}, must_not_contain={self.must_not_contain}, "
+            f"match_percentage={self.match_percentage})"
+        )
 
     def __repr__(self):
         return str(self)
@@ -37,29 +46,35 @@ class LibraryType:
 
 class Folder:
     """Represents a folder with its contents."""
+
     def __init__(self, root, dirs, basename, folder_name, files):
         self.root = root
         self.dirs = dirs
-        self.basename = basename # Name of the parent directory
-        self.folder_name = folder_name # Name of the current directory
+        self.basename = basename  # Name of the parent directory
+        self.folder_name = folder_name  # Name of the current directory
         # Dynamically load files if not provided
         if files is None:
             try:
                 # Import locally to avoid circular dependency at module level
                 from .file_utils import get_all_files_recursively_in_dir_watchdog
+
                 self.files = get_all_files_recursively_in_dir_watchdog(root)
             except ImportError:
-                 print(f"WARN: Could not import file_utils in Folder init for {root}. Files list will be empty.")
-                 self.files = []
+                print(
+                    f"WARN: Could not import file_utils in Folder init for {root}. Files list will be empty."
+                )
+                self.files = []
             except Exception as e:
-                 print(f"ERROR getting files for Folder {root}: {e}")
-                 self.files = []
+                print(f"ERROR getting files for Folder {root}: {e}")
+                self.files = []
         else:
-             self.files = files # Use provided list
+            self.files = files  # Use provided list
 
     def __str__(self):
-        return (f"Folder(root={self.root}, dirs={self.dirs}, basename={self.basename}, "
-                f"folder_name={self.folder_name}, files=[{len(self.files)} files])")
+        return (
+            f"Folder(root={self.root}, dirs={self.dirs}, basename={self.basename}, "
+            f"folder_name={self.folder_name}, files=[{len(self.files)} files])"
+        )
 
     def __repr__(self):
         return str(self)
@@ -67,18 +82,19 @@ class Folder:
 
 class File:
     """Represents a file with extracted properties."""
+
     def __init__(
         self,
         name,
         extensionless_name,
-        basename, # Often the derived series name
+        basename,  # Often the derived series name
         extension,
         root,
         path,
         extensionless_path,
-        volume_number, # Can be int, float, list, or ""
-        file_type, # 'volume' or 'chapter'
-        header_extension, # Guessed extension from header
+        volume_number,  # Can be int, float, list, or ""
+        file_type,  # 'volume' or 'chapter'
+        header_extension,  # Guessed extension from header
     ):
         self.name = name
         self.extensionless_name = extensionless_name
@@ -92,7 +108,7 @@ class File:
         self.header_extension = header_extension
 
     def __str__(self):
-         return f"File(name='{self.name}', type='{self.file_type}', vol='{self.volume_number}')"
+        return f"File(name='{self.name}', type='{self.file_type}', vol='{self.volume_number}')"
 
     def __repr__(self):
         return str(self)
@@ -100,6 +116,7 @@ class File:
 
 class Publisher:
     """Holds publisher information extracted from metadata and filename."""
+
     def __init__(self, from_meta=None, from_name=None):
         self.from_meta = from_meta
         self.from_name = from_name
@@ -113,6 +130,7 @@ class Publisher:
 
 class Volume:
     """Represents a volume (or chapter) with detailed extracted information."""
+
     def __init__(
         self,
         file_type,
@@ -121,22 +139,22 @@ class Volume:
         volume_year,
         volume_number,
         volume_part,
-        index_number, # Used for sorting, combines number and part
+        index_number,  # Used for sorting, combines number and part
         release_group,
         name,
         extensionless_name,
-        basename, # Often same as series_name initially
+        basename,  # Often same as series_name initially
         extension,
         root,
         path,
         extensionless_path,
-        extras, # List of bracketed info like (Digital)
-        publisher, # Publisher object
+        extras,  # List of bracketed info like (Digital)
+        publisher,  # Publisher object
         is_premium,
         subtitle,
         header_extension,
-        multi_volume=None, # Boolean indicating if filename suggests multiple volumes (e.g., v01-v03)
-        is_one_shot=None, # Boolean indicating if it's likely a one-shot
+        multi_volume=None,  # Boolean indicating if filename suggests multiple volumes (e.g., v01-v03)
+        is_one_shot=None,  # Boolean indicating if it's likely a one-shot
     ):
         self.file_type = file_type
         self.series_name = series_name
@@ -162,7 +180,7 @@ class Volume:
         self.is_one_shot = is_one_shot
 
     def __str__(self):
-         return f"Volume(name='{self.name}', series='{self.series_name}', type='{self.file_type}', vol='{self.volume_number}', part='{self.volume_part}')"
+        return f"Volume(name='{self.name}', series='{self.series_name}', type='{self.file_type}', vol='{self.volume_number}', part='{self.volume_part}')"
 
     def __repr__(self):
         return str(self)
@@ -170,14 +188,15 @@ class Volume:
 
 class Path:
     """Represents a configured path with associated library constraints."""
+
     def __init__(
         self,
         path,
-        path_formats=file_formats, # Use placeholder default
-        path_extensions=file_extensions, # Use placeholder default
-        library_types=library_types, # Use placeholder default
-        translation_source_types=translation_source_types, # Use placeholder default
-        source_languages=source_languages, # Use placeholder default
+        path_formats=file_formats,  # Use placeholder default
+        path_extensions=file_extensions,  # Use placeholder default
+        library_types=library_types,  # Use placeholder default
+        translation_source_types=translation_source_types,  # Use placeholder default
+        source_languages=source_languages,  # Use placeholder default
     ):
         self.path = path
         self.path_formats = path_formats
@@ -187,8 +206,10 @@ class Path:
         self.source_languages = source_languages
 
     def __str__(self):
-        return (f"Path(path={self.path}, formats={self.path_formats}, extensions={self.path_extensions}, "
-                f"types={self.library_types}, sources={self.translation_source_types}, langs={self.source_languages})")
+        return (
+            f"Path(path={self.path}, formats={self.path_formats}, extensions={self.path_extensions}, "
+            f"types={self.library_types}, sources={self.translation_source_types}, langs={self.source_languages})"
+        )
 
     def __repr__(self):
         return str(self)
@@ -196,9 +217,10 @@ class Path:
 
 class Embed:
     """Wrapper for DiscordEmbed object and optional associated file data."""
+
     def __init__(self, embed, file=None):
-        self.embed = embed # Should be a DiscordEmbed object
-        self.file = file # Optional file data (e.g., for attachments)
+        self.embed = embed  # Should be a DiscordEmbed object
+        self.file = file  # Optional file data (e.g., for attachments)
 
     def __repr__(self):
         has_file = "with file" if self.file else "no file"
@@ -207,6 +229,7 @@ class Embed:
 
 class Keyword:
     """Simple structure to hold a keyword and its score."""
+
     def __init__(self, name, score):
         self.name = name
         self.score = score
@@ -220,9 +243,10 @@ class Keyword:
 
 class RankedKeywordResult:
     """Container for keyword ranking results."""
+
     def __init__(self, total_score, keywords):
         self.total_score = total_score
-        self.keywords = keywords # List of Keyword objects
+        self.keywords = keywords  # List of Keyword objects
 
     def __str__(self):
         return f"RankedKeywordResult(total_score={self.total_score}, keywords=[{len(self.keywords)} keywords])"
@@ -233,15 +257,18 @@ class RankedKeywordResult:
 
 class UpgradeResult:
     """Represents the result of an upgrade check between two releases."""
+
     def __init__(self, is_upgrade, downloaded_ranked_result, current_ranked_result):
         self.is_upgrade = is_upgrade
-        self.downloaded_ranked_result = downloaded_ranked_result # RankedKeywordResult
-        self.current_ranked_result = current_ranked_result # RankedKeywordResult
+        self.downloaded_ranked_result = downloaded_ranked_result  # RankedKeywordResult
+        self.current_ranked_result = current_ranked_result  # RankedKeywordResult
 
     def __str__(self):
-        return (f"UpgradeResult(is_upgrade={self.is_upgrade}, "
-                f"dl_score={self.downloaded_ranked_result.total_score}, "
-                f"curr_score={self.current_ranked_result.total_score})")
+        return (
+            f"UpgradeResult(is_upgrade={self.is_upgrade}, "
+            f"dl_score={self.downloaded_ranked_result.total_score}, "
+            f"curr_score={self.current_ranked_result.total_score})"
+        )
 
     def __repr__(self):
         return str(self)
@@ -249,6 +276,7 @@ class UpgradeResult:
 
 class NewReleaseNotification:
     """Data structure for sending new release notifications."""
+
     def __init__(self, number, title, color, fields, webhook, series_name, volume_obj):
         self.number = number
         self.title = title
@@ -256,14 +284,17 @@ class NewReleaseNotification:
         self.fields = fields
         self.webhook = webhook
         self.series_name = series_name
-        self.volume_obj = volume_obj # The Volume object for this release
+        self.volume_obj = volume_obj  # The Volume object for this release
 
     def __repr__(self):
-        return f"NewReleaseNotification(series='{self.series_name}', num='{self.number}')"
+        return (
+            f"NewReleaseNotification(series='{self.series_name}', num='{self.number}')"
+        )
 
 
 class BookwalkerBook:
     """Represents a book entry scraped from Bookwalker."""
+
     def __init__(
         self,
         title,
@@ -298,9 +329,10 @@ class BookwalkerBook:
 
 class BookwalkerSeries:
     """Represents a series scraped from Bookwalker, containing multiple books."""
+
     def __init__(self, title, books, book_count, book_type):
         self.title = title
-        self.books = books # List of BookwalkerBook objects
+        self.books = books  # List of BookwalkerBook objects
         self.book_count = book_count
         self.book_type = book_type
 
@@ -310,11 +342,14 @@ class BookwalkerSeries:
 
 class IdentifierResult:
     """Holds results from matching series based on identifiers (ISBN, etc.)."""
+
     def __init__(self, series_name, identifiers, path, matches):
         self.series_name = series_name
-        self.identifiers = identifiers # List of identifiers from the source file
-        self.path = path # Path of the matched existing series folder
-        self.matches = matches # List containing [source_identifiers, matched_file_identifiers]
+        self.identifiers = identifiers  # List of identifiers from the source file
+        self.path = path  # Path of the matched existing series folder
+        self.matches = (
+            matches  # List containing [source_identifiers, matched_file_identifiers]
+        )
 
     def __repr__(self):
         return f"IdentifierResult(series='{self.series_name}', path='{self.path}')"
@@ -322,9 +357,10 @@ class IdentifierResult:
 
 class Image_Result:
     """Holds results from image similarity comparison."""
+
     def __init__(self, ssim_score, image_source):
         self.ssim_score = ssim_score
-        self.image_source = image_source # Path to the image compared against
+        self.image_source = image_source  # Path to the image compared against
 
     def __repr__(self):
         return f"Image_Result(score={self.ssim_score:.4f}, source='{os.path.basename(self.image_source)}')"

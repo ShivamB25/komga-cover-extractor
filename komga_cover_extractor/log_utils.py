@@ -7,6 +7,7 @@ from datetime import datetime
 # TODO: Ensure these are correctly imported from config module later
 from .config import errors, items_changed, LOGS_DIR, log_to_file
 
+
 # Check the text file line by line for the passed message
 # Note: Kept here for now, consider moving to file_utils later if appropriate.
 def check_text_file_for_message(text_file, message):
@@ -29,18 +30,18 @@ def check_text_file_for_message(text_file, message):
 def send_message(
     message,
     error=False,
-    log=log_to_file, # Use imported config value
+    log=log_to_file,  # Use imported config value
     error_file_name="errors.txt",
     changes_file_name="changes.txt",
 ):
     """Prints a message, logs it, and appends to error/change lists."""
     print(message)
     if error:
-        errors.append(message) # Use imported config value
+        errors.append(message)  # Use imported config value
         if log:
             write_to_file(error_file_name, message)
     else:
-        items_changed.append(message) # Use imported config value
+        items_changed.append(message)  # Use imported config value
         if log:
             write_to_file(changes_file_name, message)
 
@@ -53,11 +54,11 @@ def write_to_file(
     overwrite=False,
     check_for_dup=False,
     write_to=None,
-    can_write_log=log_to_file, # Use imported config value
+    can_write_log=log_to_file,  # Use imported config value
 ):
     """Writes a message to a specified log file."""
     write_status = False
-    logs_dir_loc = write_to or LOGS_DIR # Use imported config value
+    logs_dir_loc = write_to or LOGS_DIR  # Use imported config value
 
     # check if the logs directory exists, if not create it
     if not os.path.exists(logs_dir_loc):
