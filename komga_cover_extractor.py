@@ -13,6 +13,7 @@ import traceback
 import time
 import xml.etree.ElementTree as ET
 import zipfile
+import urllib
 from base64 import b64encode
 from datetime import datetime
 from difflib import SequenceMatcher
@@ -4443,7 +4444,7 @@ def get_input_from_user(
     # Format the prompt with example values if provided
     if example:
         if isinstance(example, list):
-            example = f" or ".join(
+            example = " or ".join(
                 [f"{example_item}" for example_item in example[:-1]]
                 + [f"{example[-1]}"]
             )
