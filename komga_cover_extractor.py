@@ -11,7 +11,6 @@ import tempfile
 import threading
 import traceback
 import time
-import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
 from base64 import b64encode
