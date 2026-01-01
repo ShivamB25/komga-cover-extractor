@@ -25,6 +25,7 @@ from posixpath import join
 from urllib.parse import urlparse
 
 import cv2
+import diskcache
 import filetype
 import numpy as np
 import py7zr
@@ -138,12 +139,7 @@ blank_black_image_path = (
 )
 
 # Cached paths from the users existing library. Read from cached_paths.txt
-cached_paths = []
-
 cached_paths_path = os.path.join(LOGS_DIR, "cached_paths.txt")
-
-# Cached identifier results, aka successful matches via series_id or isbn
-cached_identifier_results = []
 
 # watchdog toggle
 watchdog_toggle = False
@@ -180,11 +176,6 @@ image_extensions = {".jpg", ".jpeg", ".png", ".tbn", ".webp"}
 # Type of file formats for manga and novels
 file_formats = ["chapter", "volume"]
 
-# stores our folder path modification times
-# used for skipping folders that haven't been modified
-# when running extract_covers() with watchdog enabled
-root_modification_times = {}
-
 # Stores all the new series paths for series that were added to an existing library
 moved_folders = []
 
@@ -216,6 +207,111 @@ class LibraryType:
     # Convert the object to a string representation
     def __str__(self):
         return f"LibraryType(name={self.name}, extensions={self.extensions}, must_contain={self.must_contain}, must_not_contain={self.must_not_contain}, match_percentage={self.match_percentage})"
+
+
+class IdentifierResult:
+    def __init__(self, series_name, identifiers, path, matches):
+        self.series_name = series_name
+        self.identifiers = identifiers
+        self.path = path
+        self.matches = matches
+
+    def __eq__(self, other):
+        if isinstance(other, IdentifierResult):
+            return self.series_name == other.series_name and self.path == other.path
+        return False
+
+
+class CacheManager:
+    def __init__(self, cache_dir):
+        self.cache = diskcache.Cache(cache_dir)
+        self.migrate_legacy_data()
+
+    def migrate_legacy_data(self):
+        # Migrate cached_paths.txt
+        legacy_paths_file = os.path.join(LOGS_DIR, "cached_paths.txt")
+        if os.path.exists(legacy_paths_file):
+            try:
+                with open(legacy_paths_file, 'r') as f:
+                    paths = [line.strip() for line in f if line.strip() and os.path.isdir(line.strip())]
+                self.cache['paths'] = paths
+                os.rename(legacy_paths_file, legacy_paths_file + ".bak")
+                print("Migrated cached_paths.txt to diskcache.")
+            except Exception as e:
+                print(f"Error migrating cached_paths.txt: {e}")
+        
+        if 'paths' not in self.cache:
+            self.cache['paths'] = []
+        if 'identifiers' not in self.cache:
+            self.cache['identifiers'] = []
+        if 'image_similarity' not in self.cache:
+            self.cache['image_similarity'] = []
+        if 'mod_times' not in self.cache:
+            self.cache['mod_times'] = {}
+
+    @property
+    def paths(self):
+        return self.cache.get('paths', [])
+
+    @paths.setter
+    def paths(self, value):
+        self.cache['paths'] = value
+
+    def add_path(self, path):
+        paths = self.paths
+        if path not in paths:
+            paths.append(path)
+            self.paths = paths
+
+    def remove_path(self, path):
+        paths = self.paths
+        if path in paths:
+            paths.remove(path)
+            self.paths = paths
+            
+    def reorder_path_to_front(self, path):
+        paths = self.paths
+        if path in paths:
+            paths.remove(path)
+            paths.insert(0, path)
+            self.paths = paths
+
+    @property
+    def identifiers(self):
+        return self.cache.get('identifiers', [])
+
+    @identifiers.setter
+    def identifiers(self, value):
+        self.cache['identifiers'] = value
+        
+    def add_identifier(self, identifier):
+        ids = self.identifiers
+        if identifier not in ids:
+            ids.append(identifier)
+            self.identifiers = ids
+
+    @property
+    def image_similarity(self):
+        return self.cache.get('image_similarity', [])
+    
+    def add_image_similarity(self, result):
+        res = self.image_similarity
+        if result not in res:
+            res.append(result)
+            self.cache['image_similarity'] = res
+
+    @property
+    def mod_times(self):
+        return self.cache.get('mod_times', {})
+        
+    def update_mod_time(self, path, time):
+        times = self.mod_times
+        times[path] = time
+        self.cache['mod_times'] = times
+
+
+# Initialize CacheManager
+cache_manager = CacheManager(os.path.join(LOGS_DIR, "cache"))
 
 
 # The Library Entertainment types
@@ -2061,14 +2157,8 @@ def cache_path(path):
     if path in paths + download_folders:
         return
 
-    global cached_paths
-    cached_paths.append(path)
-    write_to_file(
-        "cached_paths.txt",
-        path,
-        without_timestamp=True,
-        check_for_dup=True,
-    )
+    global cache_manager
+    cache_manager.add_path(path)
 
 
 # Cleans and sorts the passed files and directories
@@ -2092,7 +2182,7 @@ def clean_and_sort(
     if (
         check_for_existing_series_toggle
         and not test_mode
-        and root not in cached_paths + download_folders + paths
+        and root not in cache_manager.paths + download_folders + paths
         and not any(root.startswith(path) for path in download_folders)
     ):
         cache_path(root)
@@ -6085,14 +6175,6 @@ def organize_by_first_letter(array_list, string, position_to_insert_at, exclude=
     return array_list
 
 
-class IdentifierResult:
-    def __init__(self, series_name, identifiers, path, matches):
-        self.series_name = series_name
-        self.identifiers = identifiers
-        self.path = path
-        self.matches = matches
-
-
 # get identifiers from the passed zip comment
 def get_identifiers(zip_comment):
     metadata = []
@@ -6213,9 +6295,8 @@ def check_for_existing_series(
     test_paths=paths,
     test_download_folders=download_folders,
     test_paths_with_types=paths_with_types,
-    test_cached_paths=cached_paths,
 ):
-    global cached_paths, cached_identifier_results, messages_to_send, grouped_notifications
+    global messages_to_send, grouped_notifications
 
     # Groups messages by their series
     def group_similar_series(messages_to_send):
@@ -6427,9 +6508,7 @@ def check_for_existing_series(
         if test_paths_with_types:
             paths_with_types = test_paths_with_types
         if test_cached_paths:
-            cached_paths = test_cached_paths
-
-    cached_image_similarity_results = []
+            cache_manager.paths = test_cached_paths
 
     if not download_folders:
         print("\nNo download folders specified, skipping check_for_existing_series.")
@@ -6523,10 +6602,10 @@ def check_for_existing_series(
 
                     # 1.1 - Check cached image similarity results
                     if (
-                        cached_image_similarity_results
+                        cache_manager.image_similarity
                         and match_through_image_similarity
                     ):
-                        for cached_result in cached_image_similarity_results:
+                        for cached_result in cache_manager.image_similarity:
                             # split on @@ and get the value to the right
                             last_item = cached_result.split("@@")[-1].strip()
 
@@ -6574,11 +6653,11 @@ def check_for_existing_series(
                         continue
 
                     # 1.2 - Check cached identifier results
-                    if cached_identifier_results and file.file_type == "volume":
+                    if cache_manager.identifiers and file.file_type == "volume":
                         found_item = next(
                             (
                                 cached_identifier
-                                for cached_identifier in cached_identifier_results
+                                for cached_identifier in cache_manager.identifiers
                                 if cached_identifier.series_name == file.series_name
                             ),
                             None,
@@ -6591,19 +6670,19 @@ def check_for_existing_series(
                                 similarity_strings=found_item.matches,
                                 isbn=True,
                             )
-                            if found_item.path not in cached_paths:
+                            if found_item.path not in cache_manager.paths:
                                 cache_path(found_item.path)
                             if done:
                                 continue
 
-                    if cached_paths:
+                    if cache_manager.paths:
                         if exclude:
-                            cached_paths = organize_by_first_letter(
-                                cached_paths, file.name, 1, exclude
+                            cache_manager.paths = organize_by_first_letter(
+                                cache_manager.paths, file.name, 1, exclude
                             )
                         else:
-                            cached_paths = organize_by_first_letter(
-                                cached_paths, file.name, 1
+                            cache_manager.paths = organize_by_first_letter(
+                                cache_manager.paths, file.name, 1
                             )
 
                     downloaded_file_series_name = clean_str(
@@ -6611,31 +6690,36 @@ def check_for_existing_series(
                     )
 
                     # organize the cached paths
-                    if cached_paths and file.name != downloaded_file_series_name:
+                    if (
+                        cache_manager.paths
+                        and file.name != downloaded_file_series_name
+                    ):
                         if exclude:
-                            cached_paths = organize_by_first_letter(
-                                cached_paths,
+                            cache_manager.paths = organize_by_first_letter(
+                                cache_manager.paths,
                                 downloaded_file_series_name,
                                 2,
                                 exclude,
                             )
                         else:
-                            cached_paths = organize_by_first_letter(
-                                cached_paths,
+                            cache_manager.paths = organize_by_first_letter(
+                                cache_manager.paths,
                                 downloaded_file_series_name,
                                 2,
                             )
 
                     # Move paths matching the first three words to the top of the list
-                    if cached_paths:
-                        cached_paths = move_strings_to_top(
-                            file.series_name, cached_paths
+                    if cache_manager.paths:
+                        cache_manager.paths = move_strings_to_top(
+                            file.series_name, cache_manager.paths
                         )
 
                     # 2 - Use the cached paths
-                    if cached_paths:
+                    if cache_manager.paths:
                         print("\n\tChecking path types...")
-                        for cached_path_index, p in enumerate(cached_paths[:], start=1):
+                        for cached_path_index, p in enumerate(
+                            cache_manager.paths[:], start=1
+                        ):
                             if (
                                 not os.path.exists(p)
                                 or not os.path.isdir(p)
@@ -6681,7 +6765,7 @@ def check_for_existing_series(
                             )
 
                             print(
-                                f"\n\t\t-(CACHE)- {cached_path_index} of {len(cached_paths)} - "
+                                f"\n\t\t-(CACHE)- {cached_path_index} of {len(cache_manager.paths)} - "
                                 f'"{file.name}"\n\t\tCHECKING: {downloaded_file_series_name}\n\t\tAGAINST:  {successful_series_name}\n\t\tSCORE:    {successful_similarity_score}'
                             )
                             if successful_similarity_score >= required_similarity_score:
@@ -6705,15 +6789,14 @@ def check_for_existing_series(
                                 if done:
                                     if test_mode:
                                         return done
-                                    if p not in cached_paths:
+                                    if p not in cache_manager.paths:
                                         cache_path(p)
                                     if (
                                         len(volumes) > 1
-                                        and p in cached_paths
-                                        and p != cached_paths[0]
+                                        and p in cache_manager.paths
+                                        and p != cache_manager.paths[0]
                                     ):
-                                        cached_paths.remove(p)
-                                        cached_paths.insert(0, p)
+                                        cache_manager.reorder_path_to_front(p)
                                         exclude = p
                                     break
                     if done:
@@ -6767,8 +6850,8 @@ def check_for_existing_series(
                             for root, dirs, files in scandir.walk(path):
                                 if (
                                     test_mode
-                                    and cached_paths
-                                    and root in cached_paths
+                                    and cache_manager.paths
+                                    and root in cache_manager.paths
                                     and root not in paths + download_folders
                                 ):
                                     continue
@@ -6783,7 +6866,7 @@ def check_for_existing_series(
 
                                 if (
                                     not match_through_identifiers
-                                    and root in cached_paths
+                                    and root in cache_manager.paths
                                 ):
                                     continue
 
@@ -6818,7 +6901,7 @@ def check_for_existing_series(
                                 print(f"Looking inside: {folder_accessor.root}")
                                 if (
                                     folder_accessor.dirs
-                                    and root not in cached_paths + download_folders
+                                    and root not in cache_manager.paths + download_folders
                                 ):
                                     if done:
                                         break
@@ -6880,20 +6963,16 @@ def check_for_existing_series(
                                                 return done
 
                                             if (
-                                                file_root not in cached_paths
+                                                file_root not in cache_manager.paths
                                                 and not test_mode
                                             ):
                                                 cache_path(file_root)
                                             if (
                                                 len(volumes) > 1
-                                                and file_root in cached_paths
-                                                and file_root != cached_paths[0]
+                                                and file_root in cache_manager.paths
+                                                and file_root != cache_manager.paths[0]
                                             ):
-                                                cached_paths.remove(file_root)
-                                                cached_paths.insert(
-                                                    0,
-                                                    file_root,
-                                                )
+                                                cache_manager.reorder_path_to_front(file_root)
                                             break
                                         elif (
                                             match_through_image_similarity
@@ -6944,7 +7023,7 @@ def check_for_existing_series(
                                                     print(
                                                         "\t\t\tAll Download Series Names Match, Adding to Cache.\n"
                                                     )
-                                                    cached_image_similarity_results.append(
+                                                    cache_manager.add_image_similarity(
                                                         f"{file.series_name} - {file.file_type} - {file.root} - {file.extension} @@ {os.path.join(folder_accessor.root, inner_dir)}"
                                                     )
                                                 done = check_upgrade(
@@ -7040,8 +7119,8 @@ def check_for_existing_series(
                                 matched_directory,
                                 matched_ids,
                             )
-                            if identifier not in cached_identifier_results:
-                                cached_identifier_results.append(identifier)
+                            if identifier not in cache_manager.identifiers:
+                                cache_manager.add_identifier(identifier)
 
                             done = check_upgrade(
                                 os.path.dirname(matched_directory),
@@ -7052,15 +7131,14 @@ def check_for_existing_series(
                             )
 
                             if done:
-                                if matched_directory not in cached_paths:
+                                if matched_directory not in cache_manager.paths:
                                     cache_path(matched_directory)
                                 if (
                                     len(volumes) > 1
-                                    and matched_directory in cached_paths
-                                    and matched_directory != cached_paths[0]
+                                    and matched_directory in cache_manager.paths
+                                    and matched_directory != cache_manager.paths[0]
                                 ):
-                                    cached_paths.remove(matched_directory)
-                                    cached_paths.insert(0, matched_directory)
+                                    cache_manager.reorder_path_to_front(matched_directory)
                         else:
                             print(
                                 "\t\t\tMatching ISBN or Series ID found in multiple directories."
@@ -8802,7 +8880,7 @@ def print_execution_time(start_time, function_name):
 
 # Extracts the covers out from our manga and novel files.
 def extract_covers(paths_to_process=paths):
-    global checked_series, root_modification_times
+    global checked_series
     global series_cover_path
 
     # Finds the series cover image in the given folder
@@ -8931,16 +9009,16 @@ def extract_covers(paths_to_process=paths):
                     not in moved_folder_names
                 ):
                     root_mod_time = get_modification_date(root)
-                    if root in root_modification_times:
+                    if root in cache_manager.mod_times:
                         # Modification time hasn't changed; continue to the next iteration
-                        if root_modification_times[root] == root_mod_time:
+                        if cache_manager.mod_times[root] == root_mod_time:
                             continue
                         else:
                             # update the modification time for the root
-                            root_modification_times[root] = root_mod_time
+                            cache_manager.update_mod_time(root, root_mod_time)
                     else:
                         # Store the modification time for the root
-                        root_modification_times[root] = root_mod_time
+                        cache_manager.update_mod_time(root, root_mod_time)
 
             files, dirs = process_files_and_folders(
                 root,
@@ -10772,7 +10850,7 @@ def check_for_new_volumes_on_bookwalker():
 
 # caches all roots encountered when walking paths
 def cache_existing_library_paths(
-    paths=paths, download_folders=download_folders, cached_paths=cached_paths
+    paths=paths, download_folders=download_folders
 ):
     paths_cached = []
     print("\nCaching paths recursively...")
@@ -10781,7 +10859,7 @@ def cache_existing_library_paths(
             if path not in download_folders:
                 try:
                     for root, dirs, files in scandir.walk(path):
-                        if (root != path and root not in cached_paths) and (
+                        if (root != path and root not in cache_manager.paths) and (
                             not root.startswith(".") and not root.startswith("_")
                         ):
                             cache_path(root)
@@ -10802,7 +10880,7 @@ def cache_existing_library_paths(
         print("\nRoot paths that were recursively cached:")
         for path in paths_cached:
             print(f"\t{path}")
-    return cached_paths
+    return cache_manager.paths
 
 
 # Sends scan requests to komga for all passed-in libraries
@@ -11939,7 +12017,6 @@ def is_root_present(root_path, target_path):
 # Optional features below, use at your own risk.
 # Activate them in settings.py
 def main():
-    global cached_paths
     global processed_files
     global moved_files
     global release_groups
@@ -11972,21 +12049,6 @@ def main():
                 download_folder_in_paths = True
                 break
 
-    # Load cached_paths.txt into cached_paths
-    if (
-        os.path.isfile(cached_paths_path)
-        and check_for_existing_series_toggle
-        and not cached_paths
-    ):
-        cached_paths = get_lines_from_file(
-            cached_paths_path,
-            ignore=paths + download_folders,
-            check_paths=True,
-        )
-
-        # get rid of non-valid paths
-        cached_paths = [x for x in cached_paths if os.path.isdir(x)]
-
     # Cache the paths if the user doesn't have a cached_paths.txt file
     if (
         (
@@ -11995,11 +12057,11 @@ def main():
         )
         and paths
         and check_for_existing_series_toggle
-        and not cached_paths
+        and not cache_manager.paths
     ):
         cache_existing_library_paths()
-        if cached_paths:
-            print(f"\n\tLoaded {len(cached_paths)} cached paths")
+        if cache_manager.paths:
+            print(f"\n\tLoaded {len(cache_manager.paths)} cached paths")
 
     # Load release_groups.txt into release_groups
     if os.path.isfile(release_groups_path):
