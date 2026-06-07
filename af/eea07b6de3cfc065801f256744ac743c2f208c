@@ -1,0 +1,32 @@
+tests/utils/test_number_utils.py
+  s_324831dd238868::t_70572c871b9545 1-534
+tests/utils/test_predicates_smoke.py
+  s_324831dd238868::t_bd97c52cfdd7f2 1-183
+tests/similarity/test_similar.py
+  s_324831dd238868::t_4ed7f24f5ee09e 1-228
+tests/utils/test_string_transforms.py
+  s_324831dd238868::t_3ae7537740285a 75-77
+  s_324831dd238868::t_d650f37ba1a795 338-341
+  s_324831dd238868::t_2b3dff19a760c0 1-74,78-337,342-467
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "afeea07b6de3cfc065801f256744ac743c2f208c",
+  "prompts": {},
+  "humans": {
+    "h_dd549485723b8f": {
+      "author": "shivam bansal <shivamban30@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_324831dd238868": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41e008b6-6f03-4eee-9632-9c80155c3399",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "shivam bansal <shivamban30@gmail.com>"
+    }
+  }
+}
