@@ -1,0 +1,38 @@
+pyproject.toml
+  s_324831dd238868::t_f69316533c66dd 1-17,26-32
+  s_324831dd238868::t_b87f1a85047f22 18-25
+tests/test_legacy_regression.py
+  s_324831dd238868::t_5ea995be98da73 1-10,12-20
+  s_324831dd238868::t_99ed63075210b8 11
+requirements-dev.txt
+  s_324831dd238868::t_0da886ce716afa 1-8
+tests/test_smoke.py
+  s_324831dd238868::t_8255240d76b7b4 36
+  s_324831dd238868::t_02492e5f9cc876 10
+tests/conftest.py
+  s_324831dd238868::t_275e79744aafdf 1-40,47-257
+  s_324831dd238868::t_a4b5c5053ff929 41-46
+tests/regression_gate.py
+  s_324831dd238868::t_b84ab767538dc4 1-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "230f8d9d88db69eb00e655ce7fde39b17baca425",
+  "prompts": {},
+  "humans": {
+    "h_dd549485723b8f": {
+      "author": "shivam bansal <shivamban30@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_324831dd238868": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41e008b6-6f03-4eee-9632-9c80155c3399",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "shivam bansal <shivamban30@gmail.com>"
+    }
+  }
+}
