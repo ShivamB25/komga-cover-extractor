@@ -1,0 +1,34 @@
+tests/archive/test_file_from_zip.py
+  s_324831dd238868::t_40a07f4e4ec7b6 1-405
+tests/archive/test_header_extension.py
+  s_324831dd238868::t_8e6939c0ea20e5 1-265
+tests/archive/test_internal_metadata.py
+  s_324831dd238868::t_e973be69e5686c 1-505
+tests/archive/test_comic_info.py
+  s_324831dd238868::t_a494b2f4dbd9da 1-290
+tests/archive/test_file_hash.py
+  s_324831dd238868::t_499aa858eac825 1-197
+tests/archive/test_zip_comment.py
+  s_324831dd238868::t_e814237feca5e5 1-255
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "40e5325b1438279b380119b840d448cabcbe5b7f",
+  "prompts": {},
+  "humans": {
+    "h_dd549485723b8f": {
+      "author": "shivam bansal <shivamban30@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_324831dd238868": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41e008b6-6f03-4eee-9632-9c80155c3399",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "shivam bansal <shivamban30@gmail.com>"
+    }
+  }
+}
