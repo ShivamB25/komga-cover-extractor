@@ -1,0 +1,23 @@
+tests/fs/test_scanning.py
+  s_324831dd238868::t_d314f797c8df95 1-614
+tests/fs/test_sorting.py
+  s_324831dd238868::t_4c1638b797171e 1-558
+tests/fs/test_file_ops.py
+  s_324831dd238868::t_216d40523b2a5f 1-712
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "7bb274aac8e7a64de826a4a4e3f11f360f806f3f",
+  "prompts": {},
+  "sessions": {
+    "s_324831dd238868": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41e008b6-6f03-4eee-9632-9c80155c3399",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "shivam bansal <shivamban30@gmail.com>"
+    }
+  }
+}
