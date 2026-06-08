@@ -1,0 +1,27 @@
+tests/engine/test_series_matching.py
+  s_324831dd238868::t_866d35c8cc9fbf 1-696
+tests/engine/test_volume_golden.py
+  s_324831dd238868::t_d9ae9292ac8256 1-941
+tests/engine/test_scoring.py
+  s_324831dd238868::t_45116336bba0f3 1-437
+tests/engine/test_premium_subtitle.py
+  s_324831dd238868::t_16bdabd89b61d5 1-457
+tests/engine/test_index_equality.py
+  s_324831dd238868::t_abfda00943268a 1-249
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "5a602d8d779200d22d2ecc5199f7b7da1f49debf",
+  "prompts": {},
+  "sessions": {
+    "s_324831dd238868": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41e008b6-6f03-4eee-9632-9c80155c3399",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "shivam bansal <shivamban30@gmail.com>"
+    }
+  }
+}
