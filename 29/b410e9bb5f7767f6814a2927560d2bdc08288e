@@ -1,0 +1,23 @@
+tests/external/test_discord.py
+  s_324831dd238868::t_88f81a474d0efe 1-90
+tests/external/test_komga.py
+  s_324831dd238868::t_e702d7c4b5e75b 1-109
+tests/external/test_bookwalker.py
+  s_324831dd238868::t_14e44dfdbfabf8 1-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "29b410e9bb5f7767f6814a2927560d2bdc08288e",
+  "prompts": {},
+  "sessions": {
+    "s_324831dd238868": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41e008b6-6f03-4eee-9632-9c80155c3399",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "shivam bansal <shivamban30@gmail.com>"
+    }
+  }
+}
