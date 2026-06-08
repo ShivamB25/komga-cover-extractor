@@ -1,0 +1,18 @@
+tests/cover_extraction/test_cover_extraction.py
+  ai_agent 1-473
+tests/cover_extraction/test_image_bw.py
+  ai_agent 1-201
+tests/cover_extraction/test_image_similarity.py
+  ai_agent 1-356
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "86c9c81bcb3618a0610ab18c4c1d512da90384f4",
+  "prompts": {},
+  "humans": {
+    "h_dd549485723b8f": {
+      "author": "shivam bansal <shivamban30@gmail.com>"
+    }
+  }
+}
