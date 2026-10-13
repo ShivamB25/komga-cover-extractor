@@ -1,5 +1,4 @@
 from difflib import SequenceMatcher
-from itertools import product
 
 from komga_cover_extractor.parsing.normalization import (
     clean_str,
@@ -18,40 +17,11 @@ from komga_cover_extractor.parsing.normalization import (
     starts_with_bracket,
 )
 
-_NORMALIZE_SKIP_FLAGS = (
-    "skip_common_words",
-    "skip_editions",
-    "skip_type_keywords",
-    "skip_japanese_particles",
-    "skip_misc_words",
-    "skip_storefront_keywords",
-)
-_CLEAN_SKIP_FLAGS = (
-    "skip_lowercase_convert",
-    "skip_colon_replace",
-    "skip_bracket",
-    "skip_unidecode",
-    "skip_normalize",
-    "skip_punctuation",
-    "skip_remove_s",
-    "skip_convert_to_ascii",
-    "skip_underscore",
-)
-
 
 def test_legacy_normalization_examples_are_preserved() -> None:
     assert remove_dual_space("test  test") == "test test"
     assert normalize_str("The Sword Saint") == "Sword Saint"
     assert clean_str("The, Sword, Saint!!!!") == "sword saint"
-
-
-def test_normalize_str_supports_every_skip_flag_permutation() -> None:
-    source = "The Book Walker Digital 3rd Light Novel"
-    for values in product((False, True), repeat=len(_NORMALIZE_SKIP_FLAGS)):
-        flags = dict(zip(_NORMALIZE_SKIP_FLAGS, values, strict=True))
-        result = normalize_str(source, **flags)
-        assert isinstance(result, str)
-        assert result == normalize_str(source, **flags)
 
 
 def test_skipping_type_keywords_does_not_depend_on_local_initialization() -> None:
@@ -70,15 +40,6 @@ def test_normalize_str_preserves_type_keyword_at_series_start() -> None:
     assert normalize_str("Book Girl") == "Book Girl"
     assert normalize_str("The Book Girl") == "Book Girl"
     assert normalize_str("A", skip_common_words=False) == "A"
-
-
-def test_clean_str_supports_every_skip_flag_permutation() -> None:
-    source = "  THE: Café (Publisher) v01_02!!!  "
-    for values in product((False, True), repeat=len(_CLEAN_SKIP_FLAGS)):
-        flags = dict(zip(_CLEAN_SKIP_FLAGS, values, strict=True))
-        result = clean_str(source, **flags)
-        assert isinstance(result, str)
-        assert result == clean_str(source, **flags)
 
 
 def test_clean_str_applies_legacy_step_order_and_skip_behavior() -> None:

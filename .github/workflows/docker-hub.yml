@@ -35,8 +35,8 @@ jobs:
       - name: Install native offline-test prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install --yes bubblewrap unrar iproute2
-      - name: Verify application, frozen corpus and installed distributions
+          sudo apt-get install --yes unrar iproute2
+      - name: Verify application and installed distributions
         run: sh tools/verify_deployment.sh "$RUNNER_TEMP/kce-proof"
       - name: Build the image only after application gates
         env:

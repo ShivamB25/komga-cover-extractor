@@ -7,7 +7,7 @@ Installed, function-first workflows for book metadata, archive conversion, artwo
 The current development runtime is normal-GIL CPython 3.14.6 on Linux x86_64. Other platforms are not verified. Native decoder and process-supervision paths require Linux.
 
 ```sh
-uv sync --locked --all-extras --group legacy
+uv sync --locked --all-extras
 uv run --locked --no-sync kce --help
 uv run --locked --no-sync kce doctor
 ```
@@ -102,7 +102,7 @@ No service/repository hierarchy or duplicate transport DTO layer is required. Ea
 
 ## Migration
 
-`komga_cover_extractor.py` and the historical qBittorrent add-on are stdlib-only guarded launchers into the installed package using the same interpreter and isolated module execution. They no longer import the executable root script or mutate `sys.path`. Install first; there is no legacy fallback. `tests.py` runs modern pytest checks; original characterization is separate.
+`komga_cover_extractor.py` and the historical qBittorrent add-on are stdlib-only guarded launchers into the installed package using the same interpreter and isolated module execution. They no longer import the executable root script or mutate `sys.path`. Install first; there is no legacy fallback. `tests.py` runs the modern behavior suite.
 
 Literal settings migration never imports or evaluates `settings.py`. Remove retired `cache_each_root_for_each_path_in_paths_at_beginning_toggle` and `short_word_filter_percentage` from canonical configuration. Fresh inventories replace trusted persisted path caches; the old shortened-word slices had no decision effect. Safe legacy migration validates and omits its historical cache boolean. The misspelled historical restructure setting is translated at the migration boundary.
 
@@ -112,25 +112,27 @@ Bare qBittorrent hosts such as `127.0.0.1` retain the legacy HTTP default; expli
 
 Watch bounds active negative-cache, pending and review work. Completed journal history is retained without an automatic purge. Keep the state store and retained originals on supported local storage.
 
-See [behavior changes](docs/refactor/BEHAVIOR_CHANGES.md), [settings migration](docs/refactor/SETTINGS_MIGRATION.md), [symbol ownership](docs/refactor/SYMBOL_MIGRATION.md), and [recovery verification](docs/refactor/VERIFICATION.md). Frozen originals are under `tests/fixtures/legacy/`; do not regenerate them to match modern behavior.
+See [configuration and settings migration](docs/configuration.md), [application boundaries and design](docs/architecture.md), and [publication and recovery](docs/recovery.md).
 
 ## Container and release proof
 
 The Docker entrypoint executes the installed program, preserves runtime UMASK and runs as a non-root application user. Keep `/books`, `/config` and `/state` separate; configuration selection is still explicit `--config`. The default `serve` invocation does not authorize mutation. Original Docker uppercase inputs are translated below native KCE values and explicit CLI overrides. Missing licensed add-on build modes fail by name before building a fake implementation.
 
-Current artifact, platform, corpus, benchmark and integration results are in [verification evidence](docs/refactor/VERIFICATION.md) and [status](docs/refactor/STATUS.md). Historical passing gates are not proof of later edits. Localhost protocol fixtures are not live-service or live BookWalker DOM verification; local Linux filesystems are not NAS/NTFS/macOS/ARM64 evidence.
+Deployment verification builds and inspects the current wheel, checks installed capabilities and exercises the non-root container. Write proof outputs outside the checkout. Localhost protocol fixtures are not live-service or live BookWalker verification; local Linux filesystems are not NAS, NTFS, macOS or ARM64 evidence.
 
 ## Development
 
 ```sh
-uv run --locked --all-extras --group legacy pytest tests --tb=short
+uv run --locked --all-extras pytest tests --tb=short
 uv run --locked --all-extras mypy src tools
-uv run --locked ruff check src tools tests --exclude tests/fixtures/legacy
+uv run --locked ruff check src tools tests
 python3 tools/export_requirements.py --check
 sh tools/verify_deployment.sh /tmp/kce-new-proof-directory
 ```
 
-Use a new proof directory. Keep fast behavioral tests, the complete frozen corpus, installed-wheel checks, real container lifecycle checks and the paired parser benchmark separate. No unsupported whole-application speedup claim follows from a parser benchmark.
+Use a new proof directory outside the checkout. Keep behavior tests, installed-wheel checks and real container lifecycle checks separate. Generated reports and copied legacy programs are not checked in or shipped.
+
+Keep tests that assert consumer-visible results, boundaries, durable state, exact artifact bytes or pixels, and failure cleanup. Do not retain self-comparisons, fixed-default restatements, constructor echoes, bare not-throw checks or duplicates of the same condition.
 
 ## License and support
 

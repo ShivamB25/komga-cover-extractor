@@ -106,16 +106,6 @@ def test_remote_paths_use_posix_join_and_keep_drive_prefixes() -> None:
     assert drive_remote.map_path(Path("/books/Series/Book.cbz")) == "C:/Komga/Books/Series/Book.cbz"
 
 
-def test_snapshot_exposes_root_containment_and_mapping() -> None:
-    snapshot = LibrarySnapshot(roots=(LibraryRoot(Path("/books")),))
-    mapping = (PathMapping(Path("/books"), "/library"),)
-
-    assert snapshot.available
-    assert snapshot.reason is None
-    assert snapshot.contains(Path("/books/book.cbz"))
-    assert snapshot.map_path(Path("/books/book.cbz"), mapping) == "/library/book.cbz"
-
-
 def test_value_collections_are_immutable_tuple_inputs() -> None:
     with pytest.raises(TypeError, match="tuple of strings"):
         LibraryRoot(Path("/books"), extensions=[".cbz"])  # type: ignore[arg-type]

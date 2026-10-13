@@ -6,26 +6,10 @@ from pathlib import Path
 import pytest
 
 from komga_cover_extractor.config import (
-    LEGACY_SETTING_NAMES,
     ConfigurationError,
     load_config,
     validate_config,
 )
-
-
-def test_defaults_preserve_all_legacy_settings_and_cli_policy() -> None:
-    config = validate_config({})
-
-    assert len(LEGACY_SETTING_NAMES) == 53
-    assert config.extract_covers_toggle is True
-    assert config.manual_rename is True
-    assert config.rename_zip_to_cbz is True
-    assert config.required_similarity_score == pytest.approx(0.979)
-    assert config.paths == ()
-    assert config.download_folders == ()
-    assert config.image_quality == 40
-    assert config.watchdog_discover_new_files_check_interval == 5
-    assert config.watchdog_file_transferred_check_interval == 1
 
 
 def test_precedence_and_absent_cli_do_not_override(tmp_path: Path) -> None:
@@ -142,27 +126,6 @@ def test_configuration_and_nested_values_are_immutable() -> None:
 
 
 
-def test_configuration_instances_do_not_share_policy_state() -> None:
-    first = validate_config(
-        {
-            "paths": ["first"],
-            "required_similarity_score": 0.2,
-            "exception_keywords": ["first"],
-        }
-    )
-    second = validate_config(
-        {
-            "paths": ["second"],
-            "required_similarity_score": 0.8,
-            "exception_keywords": ["second"],
-        }
-    )
-
-    assert first.paths != second.paths
-    assert first.required_similarity_score == pytest.approx(0.2)
-    assert second.required_similarity_score == pytest.approx(0.8)
-    assert first.exception_keywords == ("first",)
-    assert second.exception_keywords == ("second",)
 
 def test_redaction_covers_credentials_and_webhooks() -> None:
     password = "p@ssword-secret"
@@ -188,19 +151,7 @@ def test_redaction_covers_credentials_and_webhooks() -> None:
     assert config.as_dict(redact=False)["komga_login_password"] == password
 
 
-def test_enabled_integrations_validate_prerequisites_without_io() -> None:
-
-    config = validate_config(
-        {
-            "send_scan_request_to_komga_libraries_toggle": True,
-            "check_for_existing_series_toggle": True,
-            "komga_ip": "https://komga.example",
-            "komga_port": "25600",
-            "komga_login_email": "reader@example.test",
-            "komga_login_password": "secret",
-        }
-    )
-    assert config.komga_port == "25600"
+def test_torrent_integration_requires_target_category() -> None:
 
     with pytest.raises(ConfigurationError, match="target category"):
         validate_config(

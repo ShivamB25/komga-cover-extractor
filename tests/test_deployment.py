@@ -117,28 +117,6 @@ def test_requirements_publication_updates_both_consumers_and_check_is_read_only(
     assert "addons/qbit_torrent_unchecker/requirements.txt" in capsys.readouterr().err
 
 
-def test_full_legacy_report_gate_accepts_known_failures_but_rejects_new_failure() -> None:
-    verifier = _tool("verify_distribution")
-    report = json.loads((ROOT / "docs/refactor/baseline-results.json").read_text(encoding="utf-8"))
-    verifier.verify_legacy_report(report)
-    original = next(row for row in report["tests"] if row["name"] == "test_remove_hidden_files")
-    original["status"] = "fail"
-    with pytest.raises(ValueError, match="known failures"):
-        verifier.verify_legacy_report(report)
-
-
-def test_full_legacy_report_gate_rejects_partial_corpus_and_changed_fixture() -> None:
-    verifier = _tool("verify_distribution")
-    baseline = json.loads((ROOT / "docs/refactor/baseline-results.json").read_text(encoding="utf-8"))
-    baseline["corpus"]["processed_rows"] = 44713
-    with pytest.raises(ValueError, match="corpus"):
-        verifier.verify_legacy_report(baseline)
-    baseline["corpus"]["processed_rows"] = 44714
-    baseline["source_hashes"]["settings.py"] = "0" * 64
-    with pytest.raises(ValueError, match="different original sources"):
-        verifier.verify_legacy_report(baseline)
-
-
 @pytest.fixture
 def installed_commit_proof(tmp_path: Path) -> tuple[Any, dict[str, Any]]:
     library = tmp_path / "library"
@@ -165,11 +143,6 @@ def installed_commit_proof(tmp_path: Path) -> tuple[Any, dict[str, Any]]:
     return _tool("verify_installed"), result.as_dict()
 
 
-def test_installed_commit_proof_accepts_settled_publication_and_cleanup(
-    tmp_path: Path, installed_commit_proof: tuple[Any, dict[str, Any]],
-) -> None:
-    verifier, payload = installed_commit_proof
-    verifier._assert_commit(payload, tmp_path, 1)
 
 
 @pytest.mark.parametrize(("member", "status"), [

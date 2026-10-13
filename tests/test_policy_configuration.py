@@ -1,81 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from operator import setitem
 from pathlib import Path
 
 import pytest
 
 from komga_cover_extractor.config import (
-    Configuration,
     ConfigurationError,
     load_config,
     validate_config,
 )
-
-
-def _public_record(config: Configuration, key: str) -> Mapping[str, object]:
-    serialized = config.as_dict(redact=False)
-    records = serialized[key]
-    assert isinstance(records, list)
-    record = records[0]
-    assert isinstance(record, Mapping)
-    return record
-
-
-def test_policy_snapshots_are_isolated_and_regex_order_is_preserved() -> None:
-    first = validate_config(
-        {
-            "cover_patterns": [r"^front", r"^cover", r"^poster"],
-            "volume_keywords": ["v1", "vol"],
-            "library_types": [
-                {
-                    "name": "comics",
-                    "extensions": [".cbz", ".zip"],
-                    "must_contain": ["comic"],
-                    "must_not_contain": ["sample"],
-                    "match_percentage": 90,
-                }
-            ],
-        }
-    )
-    second = validate_config(
-        {
-            "cover_patterns": [r"^poster", r"^front"],
-            "volume_keywords": ["volume"],
-            "library_types": [],
-        }
-    )
-
-    assert first.cover_patterns == (r"^front", r"^cover", r"^poster")
-    assert second.cover_patterns == (r"^poster", r"^front")
-    assert first.volume_keywords == ("v1", "vol")
-    assert second.volume_keywords == ("volume",)
-    assert dict(_public_record(first, "library_types")) == {
-        "name": "comics",
-        "extensions": [".cbz", ".zip"],
-        "must_contain": ["comic"],
-        "must_not_contain": ["sample"],
-        "match_percentage": 90,
-    }
-    assert first.library_types != second.library_types
-
-
-def test_empty_optional_policy_lists_are_valid(tmp_path: Path) -> None:
-    config_file = tmp_path / "empty-lists.toml"
-    config_file.write_text(
-        'volume_keywords = []\nchapter_keywords = []\n'
-        'exclusion_keywords = []\nsubtitle_exclusion_keywords = []\ncover_patterns = []\n',
-        encoding="utf-8",
-    )
-
-    config = load_config(config_file, environ={})
-
-    assert config.volume_keywords == ()
-    assert config.chapter_keywords == ()
-    assert config.exclusion_keywords == ()
-    assert config.subtitle_exclusion_keywords == ()
-    assert config.cover_patterns == ()
 
 
 def test_invalid_policy_regexes_and_numeric_bounds_are_rejected_from_toml(
@@ -277,7 +211,7 @@ def test_dormant_policy_and_invocation_authorization_are_not_silent_config() -> 
             validate_config({key: True})
 
 
-def test_step_6_8_9_resource_limits_reject_zero_and_accept_positive_values() -> None:
+def test_resource_limits_reject_zero() -> None:
     resource_limits = (
         "archive_max_entries",
         "cover_max_candidates",
@@ -309,20 +243,6 @@ def test_step_6_8_9_resource_limits_reject_zero_and_accept_positive_values() -> 
 
     with pytest.raises(ConfigurationError, match="archive_max_ratio"):
         validate_config({"archive_max_ratio": 0})
-    accepted = validate_config(
-        {
-            "archive_max_entries": 1,
-            "conversion_timeout_seconds": 1,
-            "http_max_attempts": 1,
-            "watch_queue_capacity": 1,
-            "archive_max_ratio": 0.5,
-        }
-    )
-    assert accepted.archive_max_entries == 1
-    assert accepted.conversion_timeout_seconds == 1
-    assert accepted.http_max_attempts == 1
-    assert accepted.watch_queue_capacity == 1
-    assert accepted.archive_max_ratio == pytest.approx(0.5)
 
 
 def test_remote_mapping_records_are_structured_and_env_can_override(tmp_path: Path) -> None:

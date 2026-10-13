@@ -233,18 +233,6 @@ wheels = [
 ]
 
 [[package]]
-name = "discord-webhook"
-version = "1.4.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "requests" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/89/35/4837053ab7d781983c2dce787c5dda42918c3b2936ccadf4e097057ca29a/discord_webhook-1.4.1.tar.gz", hash = "sha256:2913c3ccb216e7d82911f96296f78b6b28b68a6f33a6fa5a61fc2da697b34a4d", size = 13724, upload-time = "2025-03-05T10:18:08.823Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/90/a4db0122694a5657d9434f5c782adc894477a2d17776309290674ba3e7ac/discord_webhook-1.4.1-py3-none-any.whl", hash = "sha256:1ed6a07d16ca0e6e6b1a91536c2fc34d0ba8251e5be37fe8850189aaf1155ee8", size = 13573, upload-time = "2025-03-05T10:18:07.426Z" },
-]
-
-[[package]]
 name = "filetype"
 version = "1.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -386,25 +374,6 @@ dev = [
     { name = "types-regex" },
     { name = "types-requests" },
 ]
-legacy = [
-    { name = "beautifulsoup4" },
-    { name = "discord-webhook" },
-    { name = "filetype" },
-    { name = "lxml" },
-    { name = "numpy" },
-    { name = "opencv-python-headless" },
-    { name = "pillow" },
-    { name = "py7zr" },
-    { name = "qbittorrent-api" },
-    { name = "rarfile" },
-    { name = "regex" },
-    { name = "requests" },
-    { name = "scandir" },
-    { name = "scikit-image" },
-    { name = "titlecase" },
-    { name = "unidecode" },
-    { name = "watchdog" },
-]
 
 [package.metadata]
 requires-dist = [
@@ -447,25 +416,6 @@ dev = [
     { name = "types-beautifulsoup4", specifier = ">=4.12,<4.15" },
     { name = "types-regex" },
     { name = "types-requests", specifier = ">=2.32,<2.33" },
-]
-legacy = [
-    { name = "beautifulsoup4", specifier = "==4.14.2" },
-    { name = "discord-webhook", specifier = "==1.4.1" },
-    { name = "filetype", specifier = "==1.2.0" },
-    { name = "lxml", specifier = "==6.0.2" },
-    { name = "numpy", specifier = ">=2.3.2,<3" },
-    { name = "opencv-python-headless", specifier = ">=4.13,<5" },
-    { name = "pillow", specifier = "==12.0.0" },
-    { name = "py7zr", specifier = ">=1.1,<2" },
-    { name = "qbittorrent-api", specifier = "==2025.7.0" },
-    { name = "rarfile", specifier = "==4.2" },
-    { name = "regex", specifier = "==2025.9.18" },
-    { name = "requests", specifier = "==2.32.5" },
-    { name = "scandir", specifier = "==1.10.0" },
-    { name = "scikit-image", specifier = ">=0.26,<0.27" },
-    { name = "titlecase", specifier = "==2.4.1" },
-    { name = "unidecode", specifier = "==1.4.0" },
-    { name = "watchdog", specifier = "==6.0.0" },
 ]
 
 [[package]]
@@ -877,20 +827,6 @@ wheels = [
 ]
 
 [[package]]
-name = "qbittorrent-api"
-version = "2025.7.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "packaging" },
-    { name = "requests" },
-    { name = "urllib3" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/7b/a2/e6e303b70f2db5a2cc2997a611b424b24a7715e1ef360b0fdaf8007ef8ab/qbittorrent_api-2025.7.0.tar.gz", hash = "sha256:f462f2817559ccaa4c6cdc12694a3153efacd50fa3285a425401ab30abc0de76", size = 1321951, upload-time = "2025-07-12T18:45:33.754Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e2/34/f9cb6f8ce8dbcd15d839d81f55846d33cee312f2f153d30dfbc7118380b4/qbittorrent_api-2025.7.0-py3-none-any.whl", hash = "sha256:6cd79af4757ec71a64e5216cbaa50bf2c436efea0d32b9a79585e0ec21e85ea9", size = 66041, upload-time = "2025-07-12T18:45:31.636Z" },
-]
-
-[[package]]
 name = "rarfile"
 version = "4.2"
 source = { registry = "https://pypi.org/simple" }
@@ -974,12 +910,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/22/31/72472449414223ed1a2da236b992adbb1a2ae59e34794574810f60ce068e/ruff-0.16.6-py3-none-win_amd64.whl", hash = "sha256:10d21c51c3495d8eaea7b703a16592117ea6eb1d649e36335aa965ff1173eb39", size = 10556402, upload-time = "2026-09-03T16:57:23.501Z" },
     { url = "https://files.pythonhosted.org/packages/fc/07/d781f8f8e1ac24bef9f3269cf62ffb1407ca24c3a8f12e5e22874f90528c/ruff-0.16.6-py3-none-win_arm64.whl", hash = "sha256:7a976c79b958f94e50a022a19f0f8c87387448020935ec14fc74331bd0a7f2c5", size = 10412850, upload-time = "2026-09-03T16:57:26.416Z" },
 ]
-
-[[package]]
-name = "scandir"
-version = "1.10.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/df/f5/9c052db7bd54d0cbf1bc0bb6554362bba1012d03e5888950a4f5c5dadc4e/scandir-1.10.0.tar.gz", hash = "sha256:4d4631f6062e658e9007ab3149a9b914f3548cb38bfb021c64f39a025ce578ae", size = 33311, upload-time = "2019-03-09T17:58:33.269Z" }
 
 [[package]]
 name = "scikit-image"

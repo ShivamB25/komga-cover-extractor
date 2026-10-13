@@ -1,6 +1,6 @@
 # Application boundaries
 
-The refactor uses one package and one application pipeline. CLI adapters and the watch coordinator construct a `RunRequest`; bootstrap owns the pipeline's resources. Parsing, matching and policy values do not own filesystem/network effects. The original application remains frozen under development-only `tests/fixtures/legacy/` for differential characterization; production code must not import it.
+The application uses one package and one pipeline. CLI adapters and the watch coordinator construct a `RunRequest`; bootstrap owns the pipeline's resources. Parsing, matching and policy values do not own filesystem or network effects. The historical monolith is not shipped as a second implementation or runtime fallback.
 
 ```mermaid
 flowchart TD
@@ -33,7 +33,7 @@ Archive, image and HTTP jobs launch one dedicated supervisor interpreter. That s
 
 ## Verification boundary
 
-Configuration and value contracts have unit and real CLI checks. The publication engine has a separate mandatory crash/failure gate before destructive feature migration; domain types alone are not proof of safe publication or full feature parity. The current execution status and concrete gate results are tracked in `docs/refactor/STATUS.md`.
+Configuration and value contracts have unit and real CLI checks. Publication tests exercise actual bytes, durable state, process crashes and fresh recovery. Generated review reports and copied legacy programs are not product inputs. Deployment checks build and exercise the current installed package and container.
 
 
 ## Cover and artwork ownership

@@ -64,17 +64,29 @@ exclude = ["**/__pycache__/**", "**/*.py[cod]"]
 [tool.hatch.build.targets.sdist]
 include = [
   "/src",
-  "/tests",
-  "/docs",
+  "/tests/**/*.py",
+  "/tests/fixtures/bookwalker",
+  "/tests/fixtures/native",
+  "/tests.py",
+  "/docs/architecture.md",
+  "/docs/configuration.md",
+  "/docs/recovery.md",
   "/README.md",
   "/Dockerfile",
   "/docker-entrypoint.sh",
   "/.dockerignore",
-  "/.github/workflows",
+  "/.gitignore",
+  "/.github/workflows/github.yaml",
+  "/.github/workflows/docker-hub.yml",
   "/komga_cover_extractor.py",
-  "/addons/qbit_torrent_unchecker",
+  "/addons/qbit_torrent_unchecker/qbit_torrent_unchecker.py",
+  "/addons/qbit_torrent_unchecker/requirements.txt",
   "/requirements.txt",
-  "/tools",
+  "/tools/export_requirements.py",
+  "/tools/verify_distribution.py",
+  "/tools/verify_installed.py",
+  "/tools/verify_container.py",
+  "/tools/verify_deployment.sh",
   "/pyproject.toml",
   "/uv.lock",
   "/.python-version",
@@ -84,8 +96,6 @@ include = [
 ]
 exclude = ["**/__pycache__/**", "**/*.py[cod]", "**/.pytest_cache/**"]
 
-[tool.hatch.build.targets.sdist.force-include]
-"tests/fixtures/legacy" = "tests/fixtures/legacy"
 
 
 [dependency-groups]
@@ -97,25 +107,6 @@ dev = [
     "hatchling>=1.26,<2",
     "types-requests>=2.32,<2.33",
     "types-beautifulsoup4>=4.12,<4.15",
-]
-legacy = [
-  "beautifulsoup4==4.14.2",
-  "discord-webhook==1.4.1",
-  "filetype==1.2.0",
-  "lxml==6.0.2",
-  "numpy>=2.3.2,<3",
-  "opencv-python-headless>=4.13,<5",
-  "pillow==12.0.0",
-  "py7zr>=1.1,<2",
-  "rarfile==4.2",
-  "regex==2025.9.18",
-  "requests==2.32.5",
-  "scandir==1.10.0",
-  "scikit-image>=0.26,<0.27",
-  "titlecase==2.4.1",
-  "Unidecode==1.4.0",
-  "watchdog==6.0.0",
-  "qbittorrent-api==2025.7.0",
 ]
 
 [tool.pytest.ini_options]

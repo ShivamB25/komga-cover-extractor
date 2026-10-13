@@ -19,10 +19,10 @@ export HOME="$out/home"
 export PYTHONUNBUFFERED=1
 cd "$root"
 
-uv sync --locked --all-extras --group legacy
+uv sync --locked --all-extras
 uv run --locked --no-sync python tools/export_requirements.py --check
-uv run --locked --no-sync ruff check src tools tests --exclude tests/fixtures/legacy
-uv run --locked --no-sync mypy src tools/export_requirements.py tools/verify_distribution.py tools/verify_installed.py tools/verify_container.py
+uv run --locked --no-sync ruff check src tools tests pyproject.toml
+uv run --locked --no-sync mypy src tools
 
 offline() {
     sudo --preserve-env=PATH,HOME,UV_CACHE_DIR,PYTHONUNBUFFERED,LD_LIBRARY_PATH unshare --net /bin/sh -eu -c '
@@ -34,17 +34,6 @@ offline() {
     ' sh "$(id -u)" "$(id -g)" "$@"
 }
 offline uv run --locked --no-sync --offline pytest tests --junitxml "$out/tests.xml"
-set +e
-offline uv run --locked --no-sync --offline python tools/characterize_legacy.py --mode all --output "$out/legacy.json" > "$out/legacy-stdout.json"
-legacy_status=$?
-set -e
-if [ "$legacy_status" -ne 1 ]; then
-    printf '%s\n' 'Frozen characterization must reproduce its known exit 1 before its report is accepted.' >&2
-    exit 1
-fi
-uv run --locked --no-sync python tools/verify_distribution.py legacy "$out/legacy.json" > "$out/legacy-proof.json"
-offline uv run --locked --no-sync --offline python tools/characterize_modern.py --output "$out/modern.json"
-uv run --locked --no-sync python tools/verify_distribution.py modern "$out/modern.json" > "$out/modern-proof.json"
 uv build --python "$root/.venv/bin/python" --no-build-isolation --out-dir "$out/dist"
 uv run --locked --no-sync python tools/verify_distribution.py package "$out/dist" > "$out/distribution-proof.json"
 uv venv --python 3.14 "$out/wheel-env"

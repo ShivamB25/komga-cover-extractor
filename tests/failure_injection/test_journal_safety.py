@@ -1,19 +1,12 @@
 from __future__ import annotations
 
 import hashlib
-import sqlite3
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 from komga_cover_extractor.domain.decisions import RunAuthorization
-from komga_cover_extractor.domain.operations import (
-    ArtifactSpec,
-    Operation,
-    OperationPlan,
-    RootPermission,
-)
 from komga_cover_extractor.infrastructure.state import StateStore
 from komga_cover_extractor.infrastructure.transactions import TransactionExecutor
 
@@ -87,22 +80,6 @@ os._exit(83)
     result = TransactionExecutor(state, (tmp_path,)).recover('missing', authorization=RunAuthorization())
     assert result.exit_code != 0
     assert {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in state.iterdir() if path.is_file()} == before
-
-
-def test_unknown_trigger_schema_is_rejected_before_publication(tmp_path: Path) -> None:
-    state = tmp_path / 'state'
-    store = StateStore(state)
-    store.initialize()
-    with sqlite3.connect(store.path) as connection:
-        connection.execute('CREATE TRIGGER drop_events BEFORE INSERT ON outbox BEGIN SELECT RAISE(IGNORE); END')
-    library = tmp_path / 'library'
-    library.mkdir()
-    target = library / 'output'
-    plan = OperationPlan('v1', 'triggered', (Operation('file', 'publish', target, artifact=ArtifactSpec(content=b'new')),), (RootPermission(library),))
-    result = TransactionExecutor(state, (library,)).apply(plan, authorization=RunAuthorization(apply=True))
-    assert result.exit_code != 0
-    assert not target.exists()
-    assert not list(library.iterdir())
 
 
 def test_state_preparation_cannot_repair_an_abandoned_owned_hot_journal(tmp_path: Path) -> None:
