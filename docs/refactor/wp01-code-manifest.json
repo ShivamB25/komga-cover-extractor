@@ -1,0 +1,21 @@
+{
+  "scope": "WP01code exactbytes after final green gates; pyproject/lock already advancingWP02 separately",
+  "files": [
+    {
+      "path": "tools/characterize_legacy.py",
+      "sha256": "b38157370da334385319073a5017af0805c5f11d170ebd583134a6422f08cf42"
+    },
+    {
+      "path": "tools/legacy_probe.py",
+      "sha256": "1725ebb846a121fee025e0f0da62739648d280066c57da23565cbaa1a2490e46"
+    },
+    {
+      "path": "tests/test_characterization_sandbox.py",
+      "sha256": "948e4049a1cb8c1d06721b0913b5f8e845a227646344bb24e084ae4524eff50d"
+    },
+    {
+      "path": "tests/test_legacy_probe.py",
+      "sha256": "ad00b4a1ff5efd51e764dcff3286c3485e2e713bb65e7be845df2f40b5da34e9"
+    }
+  ]
+}

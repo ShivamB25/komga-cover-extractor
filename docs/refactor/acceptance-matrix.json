@@ -1,0 +1,1178 @@
+[
+  {
+    "id": "B01",
+    "scenario": "Compare uploaded script and checkout",
+    "requirement": "Record both hashes and exact difference; never overwrite local modifications to force a match.",
+    "status": "verified",
+    "evidence": "docs/refactor/source-manifest.json and BASELINE_MAIN.md record checkout SHA-256 00e507f11af2b6078f3c374ac0be95908ca44d89d5b93b77c5e299a84208c23e and upload 87610a4c83f7e1244b647e9763cb9a5f875862f3fe768efeefc838f9a80f1c9e. The only byte difference is one terminal LF. Frozen checkout originals are retained without replacing user work."
+  },
+  {
+    "id": "B02",
+    "scenario": "Inventory every tracked production file and consumer",
+    "requirement": "All entry points, settings, add-ons, assets and referenced scripts have disposition; absent files are explicit.",
+    "status": "verified",
+    "evidence": "source-manifest.json and the three BASELINE ledgers inventory the original files, callers, resources, and absent optional sources. FEATURE_PARITY, SETTINGS_MIGRATION, and SYMBOL_MIGRATION retain all 66 features, 53 literal settings, 129 initialization rows, and 330 symbol identities. D14 separates final proof from inventory."
+  },
+  {
+    "id": "B03",
+    "scenario": "Run legacy tests after import audit",
+    "requirement": "Preserve original assertions and report pre-existing failures; no production filesystem/network effects.",
+    "status": "characterized",
+    "evidence": "Frozen-original sandbox fast/all reports retain exactly four historical failures: remove_ignored_folders, get_extra_from_group, get_keyword_score, has_multiple_numbers. Rename and numeric sorting remain not_asserted. legacy-interpreter-repaired.json records read-only hash-verified originals and isolated network, not an original-suite pass."
+  },
+  {
+    "id": "B04",
+    "scenario": "Inspect and execute complete CSV corpus as appropriate",
+    "requirement": "Record schema, row count/hash and actual covered outputs; raw examples are not invented labels.",
+    "status": "characterized",
+    "evidence": "Frozen CSV SHA-256 a8c196f729286940dbbb6ff8efe4edfb3267187fbc71a1023973de65d8dcc7e7. Reports account for 44714 rows, 249 original exclusions, and 44465 eligible rows. Only Release Number, Series Name, and File Type are populated label oracles. modern.json retains four explicit-set corrections, not invented extra labels."
+  },
+  {
+    "id": "B05",
+    "scenario": "Import each new package module in isolated process",
+    "requirement": "No argument parsing, directory creation, settings execution, client connection, background thread or output at import.",
+    "status": "verified",
+    "evidence": "Post-review installed-final-{all,core,covers,watch,image-similarity,conversion,integrations}.json each PASS 55 modules cold-imported in separate installed-interpreter processes with forbidden effects and unchanged HOME. The current wheel includes host/projection/fairness and final lock-release repairs; no source-tree import fallback."
+  },
+  {
+    "id": "B06",
+    "scenario": "Two application instances with different policies in one process",
+    "requirement": "No leaked caches, roots, counters, thresholds, hooks or processing lists.",
+    "status": "verified",
+    "evidence": "bootstrap.open_pipeline owns policies and run state. pipeline-isolation-proof.json PASS interleaves two complete pipelines with distinct roots, thresholds, dictionaries, counters, and hook routes. Media/list bytes are retained, hook assignments are 2A/1B per route, and repeats commit zero. Delivery arrival order is not claimed."
+  },
+  {
+    "id": "B07",
+    "scenario": "Enabled advertised feature with no implementation",
+    "requirement": "Explicit unsupported/blocked result; never a successful no-op or silently disabled toggle.",
+    "status": "verified",
+    "evidence": "The 1502-test source gate exercises unsupported_policy and retired-key rejection. container-final-proof.json verifies named MANGA_ISBN/EPUB_CONVERTER missing-source build refusals. Language/translation and move-new-series requests do not succeed as no-ops. Absent licensed add-on functionality itself remains blocked."
+  },
+  {
+    "id": "B08",
+    "scenario": "New-code architecture import audit",
+    "requirement": "Pure domain/parsing have no infrastructure/config/network dependencies; no circular runtime imports.",
+    "status": "verified",
+    "evidence": "Post-review installed-final-all.json PASS audits all 55 installed modules, direct/transitive delayed imports, zero forbidden pure dependencies, zero import-time cycles, and zero nonliteral dynamic imports. Actual isolated cold imports also pass; no absence-of-reference argument establishes deletion."
+  },
+  {
+    "id": "C01",
+    "scenario": "Same option set in defaults, TOML, environment and explicit CLI",
+    "requirement": "Documented precedence wins; absent CLI argument does not override configured value.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes test_configuration.py and test_cli.py precedence/absent-flag/root-plus-subcommand cases. config.load_config and cli._collect_overrides retain CLI > KCE environment > TOML > defaults, root-then-subcommand repeat order, and last explicit scalar/set values."
+  },
+  {
+    "id": "C02",
+    "scenario": "Relative paths from TOML and CLI, changed working directory",
+    "requirement": "Stable documented resolution bases; core never calls global chdir.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes configuration, policy, and legacy-invocation path-base cases. TOML paths use the TOML parent; CLI/environment paths use invocation cwd. Installed command receipts run outside checkout. Pure observation/parsing owners do not use global chdir."
+  },
+  {
+    "id": "C03",
+    "scenario": "Unknown key, invalid enum/boolean, invalid regex, out-of-range quality/limit",
+    "requirement": "Useful validation error and nonzero exit; no mutation before validation.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes invalid config/CLI/regex/numeric/retired-key cases with nonzero typed errors and unchanged fixture manifests. bookwalker-timeout-boundary-proof.json rejects timeout 61 before journal or local mutation. Validation and invocation authorization remain separate."
+  },
+  {
+    "id": "C04",
+    "scenario": "Integration enabled but URL/auth/optional package incomplete",
+    "requirement": "Targeted configuration/capability error; unrelated core features remain usable.",
+    "status": "verified",
+    "evidence": "Current 1506-test source gate passes incomplete integration and missing selected-capability boundaries. Seven refreshed clean installed environments PASS real unrelated core work and targeted selected-capability errors after the final lock-release repair. Absent licensed implementations remain explicit named refusals, not substitutes."
+  },
+  {
+    "id": "C05",
+    "scenario": "Secrets in environment, config, webhook URL and caught exception",
+    "requirement": "No full credentials in stdout/stderr, repr, JSON results, journals, or test fixtures.",
+    "status": "verified",
+    "evidence": "pipeline-unicode-proof.json PASS runs a mixed-Unicode failing CLI with fictional secrets and a real loopback 403. Configuration, repr, caught errors, stdout, stderr, logs, SQLite, and durable payloads exclude the secret markers. One valid local commit and retained malformed input remain truthful; repeat sends no extra POST."
+  },
+  {
+    "id": "C06",
+    "scenario": "Legacy repeated -p/-df options and literal \\\\0/\\\\1 delimiters",
+    "requirement": "Compatibility adapter preserves documented roots/type restrictions without infecting new APIs.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes test_legacy_invocation.py repeated -p/-df, roles/order, underscore aliases, and printable backslash-zero/backslash-one restriction cases. Installed absolute launchers use legacy/legacy-qbit dispatch and structured LibraryRoot values. Malformed/conflicting/unsupported restrictions fail explicitly."
+  },
+  {
+    "id": "C07",
+    "scenario": "Legacy misspelled settings and new canonical aliases conflict",
+    "requirement": "Defined conflict/warning behavior; neither silently wins unpredictably.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes configuration and migration same-source alias-conflict cases. The input boundary canonicalizes resturcture_when_renaming to restructure_when_renaming. Conflicting spellings in one source fail; ordinary higher-source precedence remains defined."
+  },
+  {
+    "id": "C08",
+    "scenario": "Safe migration of literal settings and recognized keyword objects",
+    "requirement": "Equivalent resulting policy; no generic eval/import of user settings.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes settings migration and protected-output CLI cases. Bounded AST translation accepts two-positional and named-only Keyword with file_type both, rejects duplicate/unknown arguments, and creates exclusive 0600 TOML without source execution. The retired eager-cache literal is bool-validated then intentionally omitted."
+  },
+  {
+    "id": "C09",
+    "scenario": "Legacy configuration contains dynamic call/import/comprehension",
+    "requirement": "Report unsupported dynamic expression without executing it or fabricating its value.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes test_settings_migration.py dynamic call/import/comprehension and arbitrary class-body sentinel cases. legacy_settings.migrate_settings reports unsupported expressions without executing source or fabricating a value."
+  },
+  {
+    "id": "C10",
+    "scenario": "Preview of a mutating command with logs/state already present",
+    "requirement": "No persistent library changes or remote writes; explicit plan file and scratch use are documented exceptions.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes existing-journal, hot-rollback-journal, remote-unknown preview, and observability read-only cases. Installed/container manifests show no preview library/state/log or remote mutation. Named exclusive plan/profile outputs and cleaned owned scratch are explicit exceptions, not general apply authority."
+  },
+  {
+    "id": "C11",
+    "scenario": "Environment/TOML attempts to switch on apply implicitly",
+    "requirement": "New safety boundary requires explicit invocation authorization; no accidental write mode.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes config/serve/torrent authorization boundaries. RunAuthorization defaults false; TOML, KCE inputs, Docker policy inputs, roots, and serialized plan contents cannot enable apply, allow_remote, or allow_torrent_removal. Actual loopback preview has zero mutator requests."
+  },
+  {
+    "id": "C12",
+    "scenario": "JSON/JSONL mode with errors and Unicode names",
+    "requirement": "Valid schema/encoding, diagnostics separated, reason codes and exit status match actual outcome.",
+    "status": "verified",
+    "evidence": "pipeline-unicode-proof.json PASS records actual CLI JSON for a valid Unicode job, preserved malformed input, and deferred loopback delivery. JSON/JSONL parses, diagnostics stay on stderr, reason codes/exit status match mixed outcomes, and secret markers are absent. Recorded 1502 gate includes structured-output cases."
+  },
+  {
+    "id": "C13",
+    "scenario": "Noninteractive run reaches a manual-decision case",
+    "requirement": "Review-required result without blocked stdin thread or default destructive answer.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes noninteractive manual rename/delete/conversion/dictionary cases returning review_required without default choices. Recorded terminal SIGTERM smoke exits 143 in 0.224s with zero commits/state. Explicit --interactive plus real terminals is required for a concrete choice."
+  },
+  {
+    "id": "C14",
+    "scenario": "Old launcher and installed new CLI",
+    "requirement": "Both reach intended services; no root-module import ambiguity or sys.path hack dependency.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes legacy dispatch boundaries. installed-final-all.json records absolute root application workflow and legacy-qbit loopback preview/authorized/repeat plus inert wrapper imports. Both guarded stdlib launchers exec the same installed interpreter with -I, without sys.path hacks or monolith fallback. Final distribution refresh is separately D02/D12."
+  },
+  {
+    "id": "P01",
+    "scenario": "All original volume/chapter keyword variants",
+    "requirement": "Baseline output preserved, including documented regex order.",
+    "status": "verified",
+    "evidence": "numbers.parse_release_number and filenames.parse_release retain ordered original keyword grammar. Recorded 1502 gate passes numeric/filename parity files; modern.json accounts for all 44465 eligible CSV rows. Four explicit-set changes are recorded separately from preserved keyword outcomes."
+  },
+  {
+    "id": "P02",
+    "scenario": "c000, missing number, empty string, no match",
+    "requirement": "Zero is distinguished from unknown; no unsafe truthiness conversion.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes zero-versus-missing numeric cases and committed chapter notification ordering. c000 is a known scalar zero; empty/no-match inputs remain missing. No consumer converts zero to unknown by truthiness."
+  },
+  {
+    "id": "P03",
+    "scenario": "Decimal tokens such as 1.01, 1.10, 179.1",
+    "requirement": "New parsing preserves intended numeric value and raw-token formatting; legacy differences documented.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes exact Decimal/raw-token parser and rendering cases for 1.01, 1.10, and 179.1. Source tokens preserve precision and trailing zeroes. BEHAVIOR_CHANGES records the correction from legacy float/truncation behavior."
+  },
+  {
+    "id": "P04",
+    "scenario": "Volume part 1, 9, 10, 12 plus decimal chapters",
+    "requirement": "Part remains separate; ordering does not collide through volume+part/10.",
+    "status": "verified",
+    "evidence": "documentation-numeric-proof.json PASS uses the real installed CLI outside checkout. Parts 1/9/10/12 remain separate integers with literal renderings; first/latest select 1/12, and the isolated 9/10 pair selects 9/10. Decoded PNG pixels and all source hashes agree. Decimal 001.01/001.1/001.10 retain exact tokens and renderings with part None. Previews create no state."
+  },
+  {
+    "id": "P05",
+    "scenario": "Scalar, contiguous range, noncontiguous set, multi-volume file",
+    "requirement": "Explicit semantics and bounded expansion; endpoint normalization does not silently invent members.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes range/set and installed gap-report cases. Two hyphen tokens are a contiguous range; longer written sequences retain explicit membership. v01-03-05 reports holes [2,4]. Expansion over max_expansion returns review_required/range_limit without a truncated success list."
+  },
+  {
+    "id": "P06",
+    "scenario": "'_extra', digit underscores, ordinary underscores, decimal padding",
+    "requirement": "Legacy special cases characterized; renderer policy consistent and intentional.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes _extra, numeric underscores, ordinary title underscores, and decimal padding cases. filenames.render_release retains raw _extra provenance so extras and ordinary fractional releases do not collapse onto one output."
+  },
+  {
+    "id": "P07",
+    "scenario": "Years, dates, edition numbers, part/season/episode/subtitle digits",
+    "requirement": "Correct distinction from release numbers under baseline corpus.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes episode/edition/subtitle/part/year guards and filename parity. modern.json covers every eligible date/title corpus row. Named volume-below-2000 and metadata-year-at-least-1950 heuristics remain, not silently redesigned rules."
+  },
+  {
+    "id": "P08",
+    "scenario": "Japanese markers, non-ASCII title, accented text and brackets",
+    "requirement": "Preserve display text; canonicalization tested separately from transliteration/ASCII policy.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes Japanese keyword, Unicode/bracket display, transliteration, and ASCII-discard cases. pipeline-unicode-proof.json exercises actual mixed-Unicode CLI paths. Observed display titles remain distinct from canonical matching keys and optional rendered transliteration."
+  },
+  {
+    "id": "P09",
+    "scenario": "Title consisting entirely of brackets or digits",
+    "requirement": "No indexing crash; legacy valid title exceptions preserved.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes bracket-only, numeric-only, and Unicode title cases in test_filenames.py and test_normalization.py. Literal series results are asserted without parser filesystem access or indexing crashes."
+  },
+  {
+    "id": "P10",
+    "scenario": "One-shot and folder-name fallback with differing root restrictions",
+    "requirement": "Filesystem observations passed explicitly; no hidden scan or cwd dependency in parser.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes explicit sibling/root-position/role one-shot and fallback cases. FileObservation supplies filesystem evidence; parser functions do not scan or change cwd. Installed legacy-role workflow receipts preserve configured root restrictions."
+  },
+  {
+    "id": "P11",
+    "scenario": "All normalization skip-flag combinations, especially skip_type_keywords",
+    "requirement": "No uninitialized local reference; intended normalization documented (R15).",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes every normalize_str/clean_str skip-flag permutation. R15 initializes type-keyword state independently of skip flags and preserves the documented transformation order."
+  },
+  {
+    "id": "P12",
+    "scenario": "Mixed-case identifier labels, missing delimiter, malformed ZIP comment",
+    "requirement": "No case-guard/split mismatch; malformed identifiers return explicit diagnostic (R17).",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes mixed-case identifier marker, malformed delimiter/comment/encoding, and secure metadata cases. extract_identifiers uses one bounded case-insensitive split with absent/invalid distinctions. External absent ISBN producer interoperability is not inferred from reader proof."
+  },
+  {
+    "id": "P13",
+    "scenario": "Transliteration of tokens in parse_words",
+    "requirement": "Desired canonical words actually use selected transformation; preserve original display string (R16).",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes parse_words transformed-token expectations and separate display/canonical snapshots. R16 splits the selected transliterated text; the observed display string remains unchanged."
+  },
+  {
+    "id": "P14",
+    "scenario": "Render \u2192 parse and render twice",
+    "requirement": "New renderer is deterministic and idempotent within its documented grammar; do not assume arbitrary legacy normalization is idempotent.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes literal render-parse-render and second-render expectations for parts, ranges, sets, raw decimals, _extra, and Unicode in preserve/restructure modes. This proves documented renderer grammar, not arbitrary legacy normalization idempotence."
+  },
+  {
+    "id": "P15",
+    "scenario": "Same filename with changed parsing policy/dictionary",
+    "requirement": "Cache key/invalidation observes policy version; no result leaked across runs.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes per-policy dictionary/cache and generation-refresh cases. pipeline-composition-proof.json commits a real PTY publisher choice, rebuilds rendering immediately, and converges on repeat. pipeline-isolation-proof.json keeps two complete policy snapshots independent."
+  },
+  {
+    "id": "M01",
+    "scenario": "Known match/nonmatch/near-threshold corpus",
+    "requirement": "Baseline SequenceMatcher decisions and normalization preserved initially.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes exact ordered SequenceMatcher ratios, empty=0/equal=1, threshold, and matching-tier cases. normalization.similar keeps SequenceMatcher(None, a.lower().strip(), b.lower().strip()) argument order. The three-label CSV is not a similarity-label corpus."
+  },
+  {
+    "id": "M02",
+    "scenario": "RapidFuzz or other alternative introduced experimentally",
+    "requirement": "Separate score calibration and false-positive analysis; 0-100 scaling alone is not parity.",
+    "status": "characterized",
+    "evidence": "Conditional criterion is inactive. No RapidFuzz or alternate scorer was introduced; shared normalization.similar retains SequenceMatcher. Recorded 1502 gate exercises its ordered ratios. No alternative-score calibration or 0-100 rescaling parity is claimed."
+  },
+  {
+    "id": "M03",
+    "scenario": "Empty/mixed chapter-volume folders and library restrictions",
+    "requirement": "No divide-by-zero; explicit suitability decision and policy reason.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes empty/mixed classification, every-file extension/format restrictions, and zero/multiple destination cases. classify_library_type/check_root_suitability return no_match for empty evidence, never division by zero or an empty-filter all match."
+  },
+  {
+    "id": "M04",
+    "scenario": "Equal ranking, higher ranking, lower ranking, identical hash",
+    "requirement": "Distinct decisions; equal ranking/different content is review-required, not arbitrary deletion.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes shared strict/equal/lower/identical ranking and actual organization CLI cases after comparator consolidation. Higher rank, equal-different review, lower rank, and proven equal bytes have distinct decisions and retained candidates. Equal ranking is not deletion authority."
+  },
+  {
+    "id": "M05",
+    "scenario": "Hash/read failure",
+    "requirement": "Unknown content never treated as duplicate/equal.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate includes test_hash_failure_is_an_operational_failure_not_duplicate_identity and unreadable library/unknown-digest cases. fingerprint failure stays an operational failure; organizer/ranking never turn missing hashes into equality, cleanup, or upgrade permission."
+  },
+  {
+    "id": "M06",
+    "scenario": "One identifier appears in multiple target series",
+    "requirement": "Ambiguous result retains candidates; no first-directory wins.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes repeated-identifier candidate and equally eligible series-folder cases. match_series retains both fresh candidates and reports ambiguity rather than first-directory selection. A unique identifier alone never authorizes retirement."
+  },
+  {
+    "id": "M07",
+    "scenario": "Same series title in different languages/types/roots",
+    "requirement": "Matching respects restrictions and full context, not only title.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes same-title format/extension/library-type restriction cases and unsupported legacy language/translation inputs. Supported structured restrictions constrain matching; unenforced original language/source restrictions fail unsupported_policy instead of pretending to implement provenance."
+  },
+  {
+    "id": "M08",
+    "scenario": "Cached identifier/name/image match after target replacement/removal",
+    "requirement": "Freshness checked; invalid cache cannot drive file mutation.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes expired/changed/removed cover and identifier/name evidence, explicit invalidation, and policy freshness. Six real prepared upgrade checks reject same-size/restored-mtime source changes before publication. Cache entries cannot remove new eligible candidates or authorize stale mutation."
+  },
+  {
+    "id": "M09",
+    "scenario": "Optimized candidate pruning and changed listing order",
+    "requirement": "No baseline-valid match lost; deterministic tie policy; changed selection recorded.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes reordered/uncached/cached candidate comparisons and positive/negative cover cache cases. All eligible same-tier candidates remain visible. Ambiguity replaces destructive first-directory selection; optimization does not discard baseline-valid candidates."
+  },
+  {
+    "id": "M10",
+    "scenario": "Pipeline performs rename then move then artwork handling",
+    "requirement": "Later decisions see the planned/new paths and operation dependencies.",
+    "status": "verified",
+    "evidence": "pipeline-composition-proof.json PASS covers real PTY dictionary/rendering, directory rename/type routing, gap 2, and final-path callback. A separate real full run covers header correction, rename/group/match and decoded WebP using original bytes. Recorded 1502 gate includes matched/unmatched no-prior-projected-publication regressions and zero-commit repeats."
+  },
+  {
+    "id": "M11",
+    "scenario": "Two incoming files normalize to the same destination",
+    "requirement": "Collision detected before either overwrite; no loss of second input.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes actual filename/group/directory merge collision cases. transaction-gap-first-five.json separately passes occupied restructure/upgrade book/art scenarios. Both differing inputs and associated art remain unchanged before publication; outer first-five invocation is not reported as passing."
+  },
+  {
+    "id": "M12",
+    "scenario": "Similarity/matching failure in qBittorrent decision",
+    "requirement": "Safe undecided outcome; no uncheck/delete action based on missing evidence.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes unavailable/ambiguous library, source change, and missing comparison cases through shared torrent planning. Installed legacy-qbit loopback proof selects by full path/index. Missing evidence yields undecided with zero priority/start/removal mutation, not an empty-library fallback."
+  },
+  {
+    "id": "A01",
+    "scenario": "Valid minimal CBZ/ZIP/EPUB, mixed member ordering",
+    "requirement": "Supported extension and archive contract tested without extracting entire archive.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes real worker CBZ/ZIP/EPUB selection and nested member identity cases. Installed extraction decodes the selected lexical raster without whole-archive extraction. ArchiveReader scopes selected streams and retains source bytes."
+  },
+  {
+    "id": "A02",
+    "scenario": "EPUB 2 package metadata cover reference",
+    "requirement": "Resolve exact full internal path relative to package document.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes exact EPUB2 container/rootfile/manifest-ID and missing/duplicate reference cases. resolve_epub_cover returns the complete package-relative member, never a basename-only match."
+  },
+  {
+    "id": "A03",
+    "scenario": "EPUB 3 cover-image property / intended alternate manifest cases",
+    "requirement": "Use verified spec behavior with namespace handling; unsupported metadata is explicit.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes namespace-aware EPUB3 cover-image whitespace tokens, EPUB2 fallback, and multiple authoritative candidate rejection. resolve_epub_cover follows the EPUB 3.3 manifest contract. SVG raster rendering remains explicit unsupported, not a fabricated renderer."
+  },
+  {
+    "id": "A04",
+    "scenario": "Two internal folders contain cover.jpg, one selected by OPF",
+    "requirement": "Correct full-path member wins, not first matching basename (R06).",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes nested Front Cover.jpg versus different-color same-basename decoy through XML and actual cover worker. Exact authoritative member wins. Missing/unsafe authoritative references fail instead of falling back to the decoy."
+  },
+  {
+    "id": "A05",
+    "scenario": "Percent-encoded relative member href, dot segments, host OS Windows",
+    "requirement": "Archive path semantics independent of host separators; safely normalized exact lookup.",
+    "status": "partial",
+    "evidence": "Recorded 1502 gate passes one percent decode, fragment removal, relative dot segments, and unsafe archive-name cases using POSIX member semantics on Linux. Actual Windows/NTFS execution remains unavailable. Linux separator fixtures are not Windows proof."
+  },
+  {
+    "id": "A06",
+    "scenario": "Malformed/missing container, OPF or ComicInfo; repeated metadata tags",
+    "requirement": "Defined fallback or failure; no invented authoritative metadata.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes malformed/missing container/OPF/ComicInfo, repeated tags, and diagnosed non-authoritative fallback. Metadata preserves absent versus invalid and repeated values. Invalid authoritative references do not invent metadata or silently fall back."
+  },
+  {
+    "id": "A07",
+    "scenario": "XML entities, external references and oversized metadata",
+    "requirement": "No external resolution/network request and bounded processing.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes DTD/entity/xml:base denial and exact UTF-8 metadata byte boundaries. Scoped secure XML disables external resolution/network. Supervised Linux worker memory/CPU/deadline containment is additional protection beyond header budgets."
+  },
+  {
+    "id": "A08",
+    "scenario": "Absolute/parent traversal, drive/UNC path, NUL, links/special files",
+    "requirement": "Reject according to documented policy without writing outside owned roots.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes ZIP raw NUL/traversal/absolute/drive/UNC/link/special entries and actual 7z/RAR unsafe-entry refusal before extraction. Source and out-of-scratch sentinels remain intact. Linux proof does not certify Windows junction behavior."
+  },
+  {
+    "id": "A09",
+    "scenario": "Duplicate member names or duplicate canonicalized paths",
+    "requirement": "Deterministic explicit rejection/ambiguity, never unspecified library selection.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes duplicate raw/canonical paths in ZIP and actual native 7z/RAR fixtures. Preflight returns typed invalid/ambiguous input before stage or sidecar publication, never unspecified library selection."
+  },
+  {
+    "id": "A10",
+    "scenario": "Truncated/encrypted/corrupt archive, bad member checksum",
+    "requirement": "Clear failure, no partial output and no source cleanup.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes truncated ZIP, checksum failure, encrypted ZIP/RAR/7z, and corrupt native input cases. Handles close, source bytes remain, and no partial publication/cleanup is reported as success. Unsupported encryption is explicit."
+  },
+  {
+    "id": "A11",
+    "scenario": "Entry/size/ratio/cumulative-read budgets at limit and limit+1",
+    "requirement": "Enforced during reading as well as from headers; test tiny fixtures/mocked streams instead of huge allocations.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes entry/directory, member, expansion, ratio, cumulative/reopened-read, candidate, and native WriterFactory quota boundaries. Actual streamed bytes consume one decreasing operation allowance. Linux killable worker limits cover decoder allocations that header preflight cannot bound."
+  },
+  {
+    "id": "A12",
+    "scenario": "Filename says cbz but header is RAR, or ambiguous ZIP-based format",
+    "requirement": "Correction/conversion follows explicit observed-format policy; EPUB not reclassified merely because it is ZIP.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes observed-container/header/conversion separation and composed full-run cases. pipeline-composition-proof.json corrects mis-suffixed ZIP before rename/artwork. ZIP EPUB remains EPUB because package metadata, not ZIP magic alone, determines correction."
+  },
+  {
+    "id": "A13",
+    "scenario": "No usable images, only hidden entries, unsupported image suffixes",
+    "requirement": "Explicit no-cover/unsupported result; baseline filtering policy documented.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes hidden-only/readme/no-usable-image and unsupported raster cases. select_cover_candidates/extract_cover return explicit no_cover_images or unsupported format without publication or source cleanup."
+  },
+  {
+    "id": "A14",
+    "scenario": "Source replaced or modified while archive open",
+    "requirement": "Stale observation prevents publication or triggers bounded retry; integrity proof not reduced to filename.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes open-descriptor source replacement, equal-size/restored-mtime mutations, deletion/link changes, and nonprimary multipart races near publication. assert_unchanged and executor source checks refuse stale art/conversion while retaining all current inputs."
+  },
+  {
+    "id": "I01",
+    "scenario": "Lexically first comic page differs from cover-name match",
+    "requirement": "Preserve baseline selection by default; alternate policy is explicit (R07).",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes full-path lexical comic selection. Installed and recorded container extraction decode red 01.png rather than blue cover.png as real WebP. No natural sort or new cover-name priority replaces the characterized default."
+  },
+  {
+    "id": "I02",
+    "scenario": "WebP requested with compression enabled and disabled",
+    "requirement": "Actual WebP bytes/decoder format agree with suffix (R05).",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes actual encoder WebP with compression true/false. Current container proof decodes real WEBP after compression-disabled extraction. Byte signature, decoder format, and suffix agree; changing a suffix alone is not conversion."
+  },
+  {
+    "id": "I03",
+    "scenario": "JPEG requested from palette/RGBA/CMYK/grayscale input",
+    "requirement": "Tested compositing/conversion policy; output valid and expected background/color behavior.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes actual JPEG output from RGBA, LA, palette, grayscale, and CMYK. Decoded pixels assert white transparency compositing and supported target modes. Source/archive bytes are retained."
+  },
+  {
+    "id": "I04",
+    "scenario": "Orientation, ICC/EXIF, animated input",
+    "requirement": "Deliberate retained/transformed/stripped policy; no accidental format-dependent behavior.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes decoded orientation dimensions/pixels, stripped EXIF after one orientation transform, valid unchanged-space ICC retention, incompatible ICC removal, and unsupported_animation. These are documented intentional image corrections, not byte-identical legacy parity."
+  },
+  {
+    "id": "I05",
+    "scenario": "Encoder/save failure with existing source and cover",
+    "requirement": "Both originals preserved; no deletion after caught exception (R02/R24).",
+    "status": "verified",
+    "evidence": "transaction-gap-first-five.json encoder scenario passes an actual extraction encoder fault with existing book, sidecar, and series artwork. Prior bytes remain and no false commit event is emitted. Recorded 1502 gate passes encoder-no-original-byte-fallback and publication retention cases. The outer first-five run later failed only its fixture prerequisite."
+  },
+  {
+    "id": "I06",
+    "scenario": "Truncated image and decompression/pixel/candidate limit exceeded",
+    "requirement": "Explicit bounded failure; no huge uncontrolled decode or false blank result.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes truncated/bad image, exact pixel/encoded-byte/candidate budgets, and owned worker over-output/deadline cases. Bad decode is invalid input, not blank or successful fallback. Worker resource proof is Linux-scoped."
+  },
+  {
+    "id": "I07",
+    "scenario": "Blank white/black, near-blank, dark artwork, grayscale artwork",
+    "requirement": "Baseline SSIM preprocessing characterized; false-positive cases represented.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes white/black, near-blank, dark/grayscale, channel reconciliation, threshold, and missing-resource/extra cases. compare_covers retains OpenCV 400x600 INTER_AREA, grayscale/equalize/normalize, SSIM data_range=1, and threshold 0.9. No variance/pHash replacement."
+  },
+  {
+    "id": "I08",
+    "scenario": "Existing JPEG while new format is WebP",
+    "requirement": "Explicit cross-extension policy; no deletion of old cover before new output is ready.",
+    "status": "verified",
+    "evidence": "transaction-gap-first-five.json WebP scenario passes owned JPEG-to-WebP publication kill plus fresh/repeated recovery. New output decodes as WEBP and retained JPEG bytes remain recoverable. Recorded 1502 gate covers generated cross-extension cutover and custom-art review. Outer receipt status remains failed for a later fixture prerequisite."
+  },
+  {
+    "id": "I09",
+    "scenario": "Return-data-only mode",
+    "requirement": "No sidecar or mutation; bytes/format contract matches documented mode.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes real-worker byte-only extraction and separate ByteOutputPolicy codec/quality cases. Return data always re-encodes at default quality 60 without optimize, reports actual format, and creates no sidecar/journal. Encoder failure returns typed failure, not original-byte success."
+  },
+  {
+    "id": "I10",
+    "scenario": "Repeated extraction, changed source, changed output policy",
+    "requirement": "First writes, unchanged run skips appropriately, changed source/policy re-evaluated.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes extraction/repeat inode/mtime retention, changed source with equal mtime, and policy-generation reassessment. Installed/recorded container preview/apply/repeat confirms actual WebP and unchanged repeats. Source replacement is detected independently of directory mtime."
+  },
+  {
+    "id": "I11",
+    "scenario": "Output target equals input through alias/hard link/path mapping",
+    "requirement": "Refuse dangerous operation; source archive cannot be overwritten by artwork.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes artwork hard-link-to-book and source/destination/parent alias/link refusal without decoding or replacement. checked_path and executor identity checks protect source archives from output-path convergence."
+  },
+  {
+    "id": "I12",
+    "scenario": "Two supported archives share a stem but differ by extension",
+    "requirement": "Detect shared sidecar destination and apply explicit conflict policy.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes same-stem CBZ/EPUB sibling conflicts and unknown sidecar ownership. check_book_artwork_collisions detects a shared output before any publication, including unselected siblings, and retains every candidate."
+  },
+  {
+    "id": "S01",
+    "scenario": "Volume-one versus latest-volume configuration",
+    "requirement": "Correct selected source including parts/ranges; no policy mutation during run.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes real red V01/green V02 first/latest extraction and contiguous-range endpoints. documentation-numeric-proof.json PASS additionally selects exact parts 1/9/10/12 and isolated 9/10 first/latest artwork with decoded pixels. Policy remains unchanged. Default recognition covers cover/poster, but missing-art creation is cover only."
+  },
+  {
+    "id": "S02",
+    "scenario": "Multiple volume-one releases with different identities",
+    "requirement": "Preserve documented ambiguity rules; no arbitrary cover overwrite.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes multiple distinct unparted volume-one candidates in reordered and explicit-book-selection cases. plan_series_artwork returns ambiguity and retains existing art rather than choosing one archive arbitrarily."
+  },
+  {
+    "id": "S03",
+    "scenario": "Chapter library receives cover from volume library",
+    "requirement": "Explicit mapping/matching plus appropriate first-volume selection; no unrelated series copy.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes unique matched volume-one chapter copy, ambiguous two-folder refusal, flag-off, and volume-two-only refusal. Recorded installed chapter extraction copies correct red V01 art without unselected sidecars. No arbitrary first-volume fallback remains."
+  },
+  {
+    "id": "S04",
+    "scenario": "Mixed series names or subfolders in candidate directory",
+    "requirement": "Baseline eligibility constraints preserved or documented as changes.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes configured-root, download-role, subfolder, and mixed-series eligibility with explicit observations. Restricted series-art creation does not disable otherwise authorized book sidecars. Deviations are documented, not hidden by new heuristics."
+  },
+  {
+    "id": "S05",
+    "scenario": "Existing cover/poster has same mtime but different content",
+    "requirement": "Identity decision not based solely on timestamp; preserve custom-artwork policy.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes equal-mtime/different-hash art, changed generated provenance, custom poster preservation, and upgrade association checks. Only proven generated/owned art may update. Timestamp equality alone never establishes content equality or ownership."
+  },
+  {
+    "id": "S06",
+    "scenario": "Equal content but differing times",
+    "requirement": "Avoid unnecessary rewrite; metadata update follows explicit policy.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes equal digest/different time and identical untracked art with unchanged inode/mtime/bytes. Timestamp mirroring is intentionally retired. Equal content avoids redundant publication."
+  },
+  {
+    "id": "S07",
+    "scenario": "Series-artwork commit fails after book-sidecar commit",
+    "requirement": "Recoverable partial state, original series art preserved, accurate event/counts.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate includes real pipeline SIGKILL after book/sidecar publication and series-art ENOSPC/EACCES cases. Fresh recover retains old/staged/backup artwork, tracks partial members, emits no premature group event, and does not republish verified books. The earlier 39-case gate also passed."
+  },
+  {
+    "id": "S08",
+    "scenario": "Book upgrade/remove affects associated artwork",
+    "requirement": "Only known owned/relevant sidecars updated; unrelated poster/image not guessed and deleted.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes strict upgrade/retirement, custom poster, unrelated generation, and same-stem owner cases. Original prechange releases remain ownership evidence while retired books leave the active catalog. Only relevant/journal-proven artwork moves or quarantines."
+  },
+  {
+    "id": "F01",
+    "scenario": "Existing book plus better incoming copy; staging fails",
+    "requirement": "Existing good book and incoming copy remain intact (R01).",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes strict/collection upgrade pre-stage failures and group-retained-byte budget cases. Existing good books, component books, and incoming copies retain their exact bytes when staging fails; no commit event precedes publication."
+  },
+  {
+    "id": "F02",
+    "scenario": "Same destination name, different bytes in rename and every merge path",
+    "requirement": "Preserve both; return conflict/review-required, never auto-delete (R03/R04).",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes real filename/group/directory merge collisions. transaction-gap-first-five.json adds occupied restructure/upgrade book and artwork destinations with unchanged candidate manifests and zero overwrite. The later outer fixture failure is not treated as a scenario pass."
+  },
+  {
+    "id": "F03",
+    "scenario": "Target created by another cooperating writer during apply",
+    "requirement": "No-clobber invariant holds; no exists-then-write race accepted.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes real target-created-after-stage and immediately-before-publish races plus two-process root-lock refusal. No-clobber hard-link publication preserves the external writer target and incoming candidate. No exists-then-write fallback is used."
+  },
+  {
+    "id": "F04",
+    "scenario": "Source/target fingerprint changes between planning and apply",
+    "requirement": "Stale plan refused with clear reason.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes stale source/replacement target and planning near-publication fingerprint cases. Current bytes survive with explicit stale_plan/conflict and no unauthorized destination or prevalidation state creation."
+  },
+  {
+    "id": "F05",
+    "scenario": "Modified plan file points outside permitted roots",
+    "requirement": "Revalidate plan inputs and permissions; serialized plan is not trusted authorization.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes modified-plan root/destination authorization cases. Executor permissions and invocation RunAuthorization are revalidated independently of serialized plan content. CLI does not accept arbitrary executable plans or function/command names."
+  },
+  {
+    "id": "F06",
+    "scenario": "/books versus /books-old, different drives, overlapping roots",
+    "requirement": "Component-based policy/mapping works; no substring authorization (R12).",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes /books versus /books-old, conflicting nested roots/mappings, duplicate physical-root roles, and logical remote-drive prefixes. Containment uses path components and longest matching mapping. Actual Windows drive/filesystem behavior remains outside the Linux proof."
+  },
+  {
+    "id": "F07",
+    "scenario": "Symlink/reparse point in source, destination, or parent",
+    "requirement": "Explicit safe rejection/default and residual race model; no escape of target roots.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes source, target, and parent symlinks plus unsafe artwork/native preparation links on Linux. Revalidation refuses traversal before publication. Cooperating local locks do not eliminate residual external-writer TOCTOU; Windows junction/reparse execution is unrun."
+  },
+  {
+    "id": "F08",
+    "scenario": "EXDEV move from another filesystem",
+    "requirement": "Stage/copy/validate/publish; source removed only in authorized post-commit cleanup.",
+    "status": "verified",
+    "evidence": "VERIFICATION records a real /tmp-to-/dev/shm move with different device IDs, verified destination bytes, retained original, and authorized post-commit cleanup. Recorded 1502 gate separately passes simulated EXDEV staged-copy behavior. Real-mount and simulated evidence are not conflated."
+  },
+  {
+    "id": "F09",
+    "scenario": "Filesystem does not support selected no-clobber primitive",
+    "requirement": "Tested safe alternative or fail closed; never silent overwrite fallback.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate faults unsupported hard links and proves fail-closed publication with retained source and unclobbered target. No weaker check-then-rename substitute is used. This is tested Linux local behavior, not a claim for every filesystem."
+  },
+  {
+    "id": "F10",
+    "scenario": "Case-only rename, two-file swap, cyclic directory plan",
+    "requirement": "Safe intermediates and recovery; no in-place destructive loop.",
+    "status": "partial",
+    "evidence": "Recorded 1502 gate passes Linux case-only rename, book/sidecar swaps, and cycle recovery. transaction-gap-first-five.json adds an actual three-occupied-path rotation killed after first publication and recovered fresh with all identities retained. Actual case-insensitive Windows/NTFS or equivalent filesystem proof is unavailable."
+  },
+  {
+    "id": "F11",
+    "scenario": "Disk full/permission loss during stage, backup, publish and cleanup",
+    "requirement": "Correct state classification at each stage, prior content recoverable.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes ENOSPC/EACCES immediately before/after stage, backup, publish, and cleanup plus real series-art publication faults. Fresh recover inspects member phases and retained old/new bytes, never inflating committed counts or claiming durable success on failed flush."
+  },
+  {
+    "id": "F12",
+    "scenario": "Crash before and after intent record and staging",
+    "requirement": "Restart identifies owned scratch/intent; no unrelated file cleanup.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes real process kills on both sides of operation intent, before stage intent/stage, after stage, and before publish. Fresh recovery identifies recorded owned scratch without removing unrelated lookalikes or inventing an unrecorded operation."
+  },
+  {
+    "id": "F13",
+    "scenario": "Crash after prior destination preserved but before publication",
+    "requirement": "Recovery restores/preserves usable original or safely finishes known operation.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes backed-up replacement process death and rollback-retention cases. Fresh recovery verifies independent retained original/new bytes before finishing or restoring. Target existence alone is not recovery proof."
+  },
+  {
+    "id": "F14",
+    "scenario": "Crash after publication but before committed journal record",
+    "requirement": "Reconcile content and intent; no second destructive replacement.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes publication-before-journal-commit process kills and changed-target review. Fresh/repeated recovery reconciles recorded fingerprints, preserves prior/new candidates, and does not destructively replace a verified published member twice."
+  },
+  {
+    "id": "F15",
+    "scenario": "Crash after commit before source cleanup/notification",
+    "requirement": "Resume cleanup/delivery independently; file mutation not repeated.",
+    "status": "verified",
+    "evidence": "transaction-gap-connected-delivery.json PASS kills after local commit before cleanup/delivery, then recovers fresh with zero newly committed count. A kill after one real durable mutation and fresh/repeat dispatch produces no duplicate file event/POST. Recorded 1502 gate preserves independently pending outbox work even when recover commits zero."
+  },
+  {
+    "id": "F16",
+    "scenario": "Group of book, multiple sidecars and series cover partly committed",
+    "requirement": "Journal tracks individual steps; conservative recover/compensate behavior.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate includes a real composed book/two-sidecar/owned-series-art group at publication, commit, and cleanup SIGKILL boundaries. Journal tracks each member; prior artwork and candidate bytes survive. Fresh recover finishes conservatively without republishing verified members or emitting false group success."
+  },
+  {
+    "id": "F17",
+    "scenario": "Journal unavailable/corrupt, unsupported schema, failed migration",
+    "requirement": "Fail safely; no writes whose recovery cannot be recorded.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes corrupt/unavailable state, unknown schema version, trigger/view/index, unwritable journal, and store-identity mismatch before publication. Only schema version 1 is accepted. No unjournaled filesystem mutation follows failed initialization/migration."
+  },
+  {
+    "id": "F18",
+    "scenario": "Two application processes act on same root/series",
+    "requirement": "Locking or explicit single-writer refusal verified; conflicts not silently resolved.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes real competing apply/recovery processes under deterministic physical-root and state ownership locks. A second writer cannot publish or poison a live journal. Abandoned locks require validated recovery ownership, not a stale-PID guess. No distributed NAS lock guarantee."
+  },
+  {
+    "id": "F19",
+    "scenario": "Preview of organize/duplicate/convert/recover",
+    "requirement": "No library mutation; intended consequences visible before apply.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes actual organize/duplicates/convert/recover previews, including existing journal and unknown remote work. Installed/container manifest receipts show intended plans with unchanged library/state/log bytes and zero remote mutations. Explicit named output remains the only publication exception."
+  },
+  {
+    "id": "F20",
+    "scenario": "Identical duplicates with cleanup disabled/enabled",
+    "requirement": "Disabled preserves both; enabled performs only explicitly scoped audited cleanup.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes identical duplicate preview/disabled preservation and explicitly authorized redundant-input quarantine. A verified keeper remains intact. Automatic candidate selection under manual_delete=false is policy, never implicit apply authority."
+  },
+  {
+    "id": "F21",
+    "scenario": "Hidden files and almost-empty folder",
+    "requirement": "Do not delete unrelated hidden files or parent/root directories as \u201ccleanup.\u201d",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes hidden files, nested assets, lone/custom artwork, chapter exceptions, and configured-root retention. rmdir removes only an actually empty authorized nonroot directory. Legacy hidden-file and sole-cover purges are intentionally retired."
+  },
+  {
+    "id": "F22",
+    "scenario": "Failure of fsync or unsupported directory flush",
+    "requirement": "Document actual durability level; no successful durable-commit claim without required guarantees.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes file/directory fsync faults before and after publication and refusal to reuse unflushed stage/backup. Prepublish fails closed; postpublish retains candidates/journal for recovery without durable-success. Actual durability evidence is Linux local filesystem only; NAS/NTFS is not inferred."
+  },
+  {
+    "id": "V01",
+    "scenario": "Representative supported RAR/CBR/7z archive",
+    "requirement": "Valid CBZ with intended member paths/data and metadata.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes genuine ISC-licensed compressed/solid RAR and generated 7z conversion, canonical member-path/hash manifests, nested Unicode paths, and original retention. Installed conversion decodes through unrar 1:7.2.4-1 and locked py7zr 1.1.3. Native import success is not the proof."
+  },
+  {
+    "id": "V02",
+    "scenario": "Native tool or optional Python package absent",
+    "requirement": "Actionable capability error; no source deletion or fake success.",
+    "status": "verified",
+    "evidence": "Current 1506 gate passes missing unrar and no-fallback boundaries without source deletion. Refreshed conversion/core/other-extra wheel receipts PASS actual selected conversion and targeted absent-package errors. Native unrar 1:7.2.4-1 and generated 7z work are independently exercised; import presence alone is not conversion proof."
+  },
+  {
+    "id": "V03",
+    "scenario": "Existing same-stem CBZ with same/different content",
+    "requirement": "Explicit conflict/duplicate policy via shared executor.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes invalid/different same-stem CBZ collisions and validated identical outputs. Existing files are never predeleted. Identical content skips without source retirement; replacement needs explicit concrete authority and retained prior bytes."
+  },
+  {
+    "id": "V04",
+    "scenario": "Extraction timeout, process nonzero exit, corrupt member",
+    "requirement": "Preserve source; controlled owned-scratch cleanup; diagnostic captures bounded output.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes decoder deadline/nonzero/over-output/corrupt input, real solid-RAR cancellation, and owned process-group reaping. Original and journal-bound scratch survive as required. Recorded native decoder/descendant PIDs distinguish genuine native execution from substitute worker lifecycle proof."
+  },
+  {
+    "id": "V05",
+    "scenario": "Filename contains spaces, shell metacharacters or leading dash",
+    "requirement": "Argument-array invocation and option handling; no shell interpretation.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate decodes a genuine compressed solid RAR named with a leading dash, spaces, semicolon, and $(not-executed). Native commands use argument arrays; decoded manifest is verified and no shell effect occurs."
+  },
+  {
+    "id": "V06",
+    "scenario": "Archive links/traversal or excessive expansion",
+    "requirement": "Refuse safely under budgets; no writes outside scratch.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes actual 7z/RAR link/traversal/duplicate/expansion refusal and WriterFactory streamed per-member/cumulative caps. Out-of-scratch sentinels and source bytes survive. Entry metadata and supervised worker limits supplement declared-header budgets."
+  },
+  {
+    "id": "V07",
+    "scenario": "Multivolume/encrypted/solid archive edge cases",
+    "requirement": "Supported behavior tested or unsupported reason explicit; no silent partial conversion.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes complete unencrypted multipart RAR, incomplete/changed-part failure, solid decode, and explicit encrypted-input unsupported results. Every source part remains until verified grouped publication and separately authorized cleanup. No password guessing or partial-success conversion."
+  },
+  {
+    "id": "V08",
+    "scenario": "Conversion completed but validation/publication/cleanup fails",
+    "requirement": "Distinct states; original preserved until validated commit and authorized cleanup.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes validated native stage followed by publication/cleanup failure, multipart race, and fresh recovery. Source parts and recorded stage remain recoverable. First new group commit counts one; cleanup-only/completed recovery counts zero and never republishes."
+  },
+  {
+    "id": "V09",
+    "scenario": "Required metadata/ZIP comment/artwork assets survive conversion",
+    "requirement": "Compare semantic/member contents; no accidental drop in packaging path.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate compares actual 7z nested images/XML/OPF/extensionless assets and real RAR archive/member comments against published CBZ manifests. Paths and content hashes survive, not merely archive names or import success."
+  },
+  {
+    "id": "V10",
+    "scenario": "Extension correction without format conversion",
+    "requirement": "Rename reflects verified container interpretation; no false conversion claim.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes header-only ZIP comic/EPUB correction separately from native conversion. Recorded supervised correction retains exact book and same-stem art bytes. Full-run composition observes corrected virtual names without a false format-conversion count."
+  },
+  {
+    "id": "W01",
+    "scenario": "File grows, pauses with same size, then resumes",
+    "requirement": "Not treated as permanently complete after one unchanged-size sample (R09).",
+    "status": "verified",
+    "evidence": "watch-lifecycle-proof.json PASS uses real Linux inotify and the canonical pipeline with a paused/resumed writer and archive readiness rechecks before actual WebP commit. Recorded 1502 gate covers growth and downloader observations. Stability alone remains evidence, not a guarantee against any external paused writer."
+  },
+  {
+    "id": "W02",
+    "scenario": "Modify-in-place with unchanged directory mtime",
+    "requirement": "Reconciliation/file fingerprint detects relevant change (R13).",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes same-size edit with restored file/unchanged directory mtime and new quiet-window recovery cases. WatchCoordinator compares source fingerprints, not directory timestamps, and treats changed bytes at one path as a new generation."
+  },
+  {
+    "id": "W03",
+    "scenario": "Rename/move completed book into watched directory",
+    "requirement": "Candidate discovered even without original created event.",
+    "status": "verified",
+    "evidence": "watch-lifecycle-proof.json PASS renames completed temporary archives into real inotify roots, then commits two Atlas and one Boreal generations. Recorded 1502 gate covers moved/create/modify/delete intake and reconciliation without requiring an earlier created event."
+  },
+  {
+    "id": "W04",
+    "scenario": "Repeated/burst/coalesced events for same source",
+    "requirement": "One effective job per valid observation; no duplicate destructive commit.",
+    "status": "verified",
+    "evidence": "watch-lifecycle-proof.json PASS injects 2000 duplicate events through the real coordinator and observes one canonical commit per source fingerprint plus zero-commit repeats. Recorded 1502 gate covers coalesced intake and durable generation identities."
+  },
+  {
+    "id": "W05",
+    "scenario": "Queue at capacity and notification overflow",
+    "requirement": "Bounded memory; backpressure or reconciliation preserves correctness.",
+    "status": "verified",
+    "evidence": "watch-lifecycle-proof.json PASS exercises real canonical-pipeline overflow. watch-long-run-after.json negative/failed-hook scenarios separately bound active state at limit 16 with preserved reconciliation and untouched pending inputs. Recorded 1502 gate adds apply admission-cursor fairness. Completed durable audit history is not claimed bounded; W12 remains partial."
+  },
+  {
+    "id": "W06",
+    "scenario": "Application writes sidecars/temp files/quarantine",
+    "requirement": "No recursive self-triggering processing loop.",
+    "status": "verified",
+    "evidence": "watch-lifecycle-proof.json PASS decodes actual generated WebP and observes no feedback-loop commits. Recorded 1502 gate excludes sidecars, state, staging, quarantine, hidden names, and custom-filter attempts from source intake."
+  },
+  {
+    "id": "W07",
+    "scenario": "File disappears or mount disconnects during readiness",
+    "requirement": "Explicit deferred/missing state with bounded retry; no global crash.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes deleted-observation cancellation, missing-root defer/recreation, and real local PollingObserver rebuild after directory replacement. Retries are bounded and explicit. Directory replacement simulates remount behavior; it does not prove an actual NAS/removable mount."
+  },
+  {
+    "id": "W08",
+    "scenario": "Two files for same series plus independent other series",
+    "requirement": "Serialize conflicting changes; unrelated work can proceed within bounds.",
+    "status": "verified",
+    "evidence": "watch-lifecycle-proof.json PASS processes two Atlas books plus independent Boreal through one real active pipeline, with eventual unique commits and retained bytes. Recorded 1502 gate preserves selected roots and serial execution. Parallel per-series throughput is not promised."
+  },
+  {
+    "id": "W09",
+    "scenario": "Shutdown during readiness, processing or remote retry",
+    "requirement": "Intake stops, pending state preserved, workers/resources terminate cleanly.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate covers SIGTERM readiness checkpoint and observer cleanup. watch-long-run-after.json cancel-archive and cancel-post scenarios PASS actual owned worker reaping. Precommit cancellation retains resumable work; post-send cancellation keeps the local commit and durable unknown review. Its unrelated lifecycle fixture failure is not a whole-run pass."
+  },
+  {
+    "id": "W10",
+    "scenario": "Restart with completed, pending, stale and failed jobs",
+    "requirement": "Correct invalidation/replay; no reuse solely by path.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes fresh-process complete/pending/interrupted/changed-generation watch recovery. Recorded before/after receipts retain prior SHA delivery-review obligation while admitting the replacement fingerprint, which correctly conflicts rather than replaying old work. Path-only reuse is not allowed."
+  },
+  {
+    "id": "W11",
+    "scenario": "Monotonic and wall clocks diverge",
+    "requirement": "Quiet windows/retry intervals unaffected by wall-clock jumps.",
+    "status": "verified",
+    "evidence": "watch-long-run-after.json monotonic scenario PASS observes two transient invalid archives with unchanged 4-second retry eligibility despite +31622400/-63244800-second wall jumps. Recorded 1502 gate separately covers quiet-window divergence. Outer lifecycle fixture failure does not invalidate this recorded scenario result."
+  },
+  {
+    "id": "W12",
+    "scenario": "Long run with many paths, negative matches and failed hooks",
+    "requirement": "Cache, outbox and pending-job retention bounded and observable.",
+    "status": "partial",
+    "evidence": "watch-long-run-after.json has PASS negative/failed-hook/completed-history scenarios over 64 paths and 512 ticks at active limit 16. Negative inputs all become observable with zero mutations; failed hooks retain 16 review/failed rows and leave 48 sources untouched, with measured stable RSS. Completed journal/outbox audit history is explicitly uncapped. No bounded durable-history, asymptotic, NAS, or performance claim."
+  },
+  {
+    "id": "W13",
+    "scenario": "Polling fallback on declared deployment filesystem",
+    "requirement": "Actual support tested or limitation explicit; fake event tests not labeled NAS verification.",
+    "status": "blocked",
+    "evidence": "Recorded 1502 gate passes actual local Linux PollingObserver/root-replacement behavior. Actual SMB/NFS/FUSE/NAS or other declared shared-filesystem fixtures are unavailable. This blocked platform portion is explicit; fake events or local directory replacement are not NAS verification."
+  },
+  {
+    "id": "K01",
+    "scenario": "Base URL contains path prefix and configured port/auth",
+    "requirement": "Correct request URL/auth; no dropped prefix or duplicated port.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes actual loopback prefixed URLs, UTF-8 Basic auth, embedded/explicit/empty separate ports, and proxy/netrc isolation. Recorded Komga GET and confirmed 202 scan preserve prefix and optional-port behavior. Live deployment compatibility is not claimed."
+  },
+  {
+    "id": "K02",
+    "scenario": "Library list success, malformed payload, auth denied and server error",
+    "requirement": "Distinct typed outcomes; service failure not treated as empty library.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes actual loopback valid/empty library payloads, malformed schemas, 401/403, and exhausted 503 retries. get_komga_libraries distinguishes service failure from an empty valid list with typed outcomes, not fallback equality."
+  },
+  {
+    "id": "K03",
+    "scenario": "Connection/read/write/pool stall",
+    "requirement": "Explicit bounds and cleanup; no indefinite pipeline hang (R10).",
+    "status": "verified",
+    "evidence": "transport-final-proof.json PASS proves actual stalled TLS establishment and blocked upload at the unmodified 60-second deadline plus cancellation, with every owned worker reaped. Recorded 1502 gate also covers read/header/body stalls. Per-attempt Requests sessions use max_retries=0 and pool_block=false; no shared blocking pool exists to exhaust."
+  },
+  {
+    "id": "K04",
+    "scenario": "Several committed changes in same library",
+    "requirement": "Scan coalesced according to documented policy, after successful commits.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes transaction-backed postcommit Komga intent/coalescing and authorization cases, not only pure mapping. delivery creates unique operation/library scan rows after verified commits and coalesces affected libraries. Loopback request observations remain distinct from live Komga proof."
+  },
+  {
+    "id": "K05",
+    "scenario": "Failed file operation",
+    "requirement": "No scan/success event falsely associated with an uncommitted change.",
+    "status": "verified",
+    "evidence": "transaction-gap-komga-failure.json PASS observes scan-enabled publication failure with zero wire requests and zero success events. Fresh positive recovery produces exactly one confirmed scan. Recorded 1502 gate passes local-event/source-failure delivery boundaries."
+  },
+  {
+    "id": "K06",
+    "scenario": "Timeout after scan POST may have reached server",
+    "requirement": "No blind exactly-once claim or unsafe unbounded replay; method-aware strategy.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes actual scan POST timeout and durable unknown acceptance/restart cases. One possible mutation remains pending_unknown/review rather than blindly rescanned. Connected delivery recovery retains local identity and does not imply exactly-once remote delivery."
+  },
+  {
+    "id": "K07",
+    "scenario": "Local and server roots differ, overlapping prefixes",
+    "requirement": "Explicit mapping and longest valid component prefix; no drive-stripping guess.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes longest valid local-to-remote component-prefix mappings and excludes /books-old from /books. Explicit PathMapping replaces drive stripping. Logical mapping and real loopback request contracts are proved; actual server mount compatibility remains unrun."
+  },
+  {
+    "id": "K08",
+    "scenario": "Redirect or unexpected host in authenticated request",
+    "requirement": "Explicit security policy; no credential forwarding to arbitrary target.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes actual TLS certificate refusal, authenticated cross-origin/outside-prefix redirect denial, and mutation redirect refusal. Wire capture shows no forwarded credentials to arbitrary hosts. No live endpoint or bypass is used."
+  },
+  {
+    "id": "N01",
+    "scenario": "Same call arguments repeated across several Discord hooks",
+    "requirement": "Rotation advances without memoization (R08).",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes actual loopback identical-message hook rotation and failure advancement. pipeline-isolation-proof.json confirms independent route assignments for two complete pipelines. Selection is run-owned and never memoized; arrival order is not the rotation proof."
+  },
+  {
+    "id": "N02",
+    "scenario": "Multiple notifications with different embeds/attachments",
+    "requirement": "No stale mutable payload bleed; correct attachment bytes/type/name.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes actual fresh JSON/multipart PNG/WebP attachment names, media types, bytes, and no payload bleed. transport-final-proof.json producer cases preserve real raster bytes/pixels/hash multiset through durable batches."
+  },
+  {
+    "id": "N03",
+    "scenario": "Fields/batches/attachments near current service limits",
+    "requirement": "Split/truncate according to verified documented limits; preserve meaningful message content.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes field/aggregate text/ten-embed boundaries. transport-final-proof.json cites official Discord message/webhook limits and PASS real multipart attachment, 20MiB aggregate minus/at/plus boundaries, encoded request below 25MiB, and 67108864-byte worker JSON admission. Meaningful names/numbers and raster content are preserved or explicitly rejected; live upload entitlement is not assumed."
+  },
+  {
+    "id": "N04",
+    "scenario": "429, permanent failure, transient failure and ambiguous delivery",
+    "requirement": "Bounded documented retries; honor permitted delay; no file-operation replay.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes 429 Retry-After bounds, permanent/read-only retry, and durable ambiguous mutation cases. http-predispatch-after.json proves quota/cancel/launch failures are typed definite-unsent with zero wire. Successful worker spawn stays conservative unknown. Connected delivery recovery and transport-final-proof.json show no local replay or blind unknown POST replay."
+  },
+  {
+    "id": "N05",
+    "scenario": "Main/BookWalker/new-volume channels configured separately",
+    "requirement": "Correct routing and independent payload/queue state.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes actual loopback normal/new-release/BookWalker released/preorder routing and independent normal rotation. Current secrets resolve at dispatch from channel IDs, not persisted webhook URLs. Synthetic BookWalker content is not current live-site compatibility."
+  },
+  {
+    "id": "N06",
+    "scenario": "Hook failure and error logging",
+    "requirement": "No recursive webhook error loop, credential leak, or false delivered status.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes hook confirmation/rejection, observability redaction, durable false-delivered prevention, and no recursive webhook error sending. pipeline-unicode-proof.json verifies actual logs/journal/stdout/stderr after real 403 while retaining one local commit and zero repeat POSTs."
+  },
+  {
+    "id": "N07",
+    "scenario": "Saved BookWalker search/detail pages with missing nodes",
+    "requirement": "Robust explicit parse errors; no fabricated release list.",
+    "status": "partial",
+    "evidence": "Recorded 1502 gate passes synthetic saved search/detail pages with missing/changed nodes and typed parse errors. tests/fixtures/bookwalker/provenance.json records that no public response was fetched. A permitted versioned real current-DOM fixture remains unavailable; synthetic parser coverage is not live DOM parity."
+  },
+  {
+    "id": "N08",
+    "scenario": "BookWalker returns 403, 429, empty body or changed DOM",
+    "requirement": "Do not conflate them; no access-control bypass or uncontrolled retries.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes BookWalker consumer distinctions for 403, 429, empty/non-HTML responses, and changed synthetic DOM. Actual loopback transport enforces denial/retry/deadline policy. No access-control bypass, fabricated empty success, or live BookWalker compatibility claim."
+  },
+  {
+    "id": "N09",
+    "scenario": "Released today, future preorder, no date, parts and collections",
+    "requirement": "Injected explicit date semantics; unknown date not invented as released.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes injected-clock today/released/preorder/unknown/invalid date cases plus exact parts/collections. Known date ordering remains explicit; absent price is unknown and missing date never becomes fabricated release/preorder data. HTML fixtures are synthetic."
+  },
+  {
+    "id": "N10",
+    "scenario": "Shortened/alternative search exits early or raises",
+    "requirement": "Global matching threshold unchanged (R20).",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes shortened-search early-return/raise and below-threshold alternative similarity cases. The 0.03 single-series relaxation remains local. Later unrelated searches retain the configured global snapshot threshold."
+  },
+  {
+    "id": "N11",
+    "scenario": "Grouping duplicate series/books while iterating",
+    "requirement": "No dropped/duplicated entries from mutation of traversed collection.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes grouping duplicate URLs and all literal book identities in numeric order. group_bookwalker_books does not mutate its traversed list or drop repeated-series releases. Source fixtures remain synthetic."
+  },
+  {
+    "id": "N12",
+    "scenario": "Local library comparison with remote ranges/parts/unknowns",
+    "requirement": "Distinguish exact match, covered range and uncertainty; preserve intended filtering.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes exact membership/range coverage/set holes/part/premium and unknown remote comparison. compare_bookwalker_releases preserves uncertainty rather than inventing no releases or false coverage. No live remote catalog is claimed."
+  },
+  {
+    "id": "N13",
+    "scenario": "qBittorrent add-on launched independently or imported",
+    "requirement": "No root executable import, eager CLI parsing or unintended startup actions.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes independent adapter/import boundaries. installed-final-all.json records inert wrapper cold imports and absolute helper legacy-qbit loopback preview, authorized full-path/index actions, zero-repeat mutations, real readiness, and SIGTERM reaping. No executable main/settings import or eager parse-at-import remains. Fresh distribution audit remains D12."
+  },
+  {
+    "id": "N14",
+    "scenario": "Existing higher/lower/equal ranked torrent/library releases",
+    "requirement": "Public ranking API provides consistent decisions and configured selection behavior.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes shared strict/equal/lower torrent ranking, full relative identity, convertible comparison suffix, and stable smallest-first order. Installed legacy-qbit loopback proof unchecks only the intended index and starts retained work. Live server compatibility is not inferred."
+  },
+  {
+    "id": "N15",
+    "scenario": "Unknown torrent metadata/library unreadable/auth failure",
+    "requirement": "Fail closed; do not remove/uncheck content based on unavailable evidence.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes unavailable/ambiguous library, auth/version failure, metadata wait, and source-change revalidation with zero mutator actions. qbit-host-after.json additionally proves bare legacy host reaches real read-only startup without state or commits. Unknown evidence never authorizes priority/start/removal."
+  },
+  {
+    "id": "N16",
+    "scenario": "Torrent-delete or delete-content feature disabled",
+    "requirement": "Mock asserts destructive endpoint/flag never sent; enabled path needs explicit authorization.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes preview/local-apply no remote authority and separately authorized deletion, including same-hash readded generation refusal. Recorded real qbit wire has no delete by default and sends literal deleteFiles=false only with both explicit flags. Content deletion is never requested."
+  },
+  {
+    "id": "N17",
+    "scenario": "qBittorrent client/server version or response shape differs",
+    "requirement": "Targeted unsupported/validation behavior and version-specific contract tests.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes Web API >=2.11 start versus older resume, unknown/malformed version refusal, schema validation, and response-order index fallback. Direct Requests mutations avoid locked SDK forced retry semantics. Offline contract/loopback proof does not certify live server versions."
+  },
+  {
+    "id": "N18",
+    "scenario": "Add-on process restart/stop with queued work",
+    "requirement": "Clean lifecycle and state; no duplicate unintended API mutations.",
+    "status": "verified",
+    "evidence": "Recorded 1502 gate passes real crash around scripted qbit dispatch, unknown-start reconciliation, and cancellable reconnect. Recorded fresh CLI retry settles one pending job with exactly one start and zero repeat mutations. installed-final-all.json and recorded container proof show actual independent helper readiness/stop/reaping, not only synthetic children."
+  },
+  {
+    "id": "D01",
+    "scenario": "Clean environment resolves declared dependencies and extras",
+    "requirement": "Real lock generated; no hand-edited versions, no undeclared ambient packages.",
+    "status": "verified",
+    "evidence": "Generated uv.lock and canonical exports remain authoritative. Seven prepared clean environments were refreshed with only the current app wheel; each PASS matches its selected locked dependency inventory and real capability work. No dependency setup was repeated or ambient optional package inferred. Canonical export check PASS."
+  },
+  {
+    "id": "D02",
+    "scenario": "Build wheel/sdist and install wheel outside repository",
+    "requirement": "CLI, resource loading and imports work without source tree/sys.path.",
+    "status": "verified",
+    "evidence": "Actual final wheel built from development sdist PASS package verification, eight exact frozen inputs, runtime blank resources and no frozen executables. Source distribution includes README/all maintained docs after repairing its baseline-only documentation allowlist. Thirty existing package/deployment tests PASS0.43s. Runtime wheel stays SHAf94889b50c2d40971d76ea1f7c6fcb68c8319f6b6990d0f7b2b030fc739007c3, already proven across seven installed environments and actual final image. Documentation-only config changes do not require redundant app installs/image rebuild."
+  },
+  {
+    "id": "D03",
+    "scenario": "Every claimed Python/OS combination",
+    "requirement": "Actual command results attached or clearly marked not run; no blanket compatibility claim.",
+    "status": "partial",
+    "evidence": "Source and installed proofs use Linux x86_64 CPython3.14.6. Final container-stage-final-proof.json PASS uses CPython3.14.8 on the immutable pinned image. Windows/NTFS, macOS, ARM64 and NAS/nonlocal execution remain unavailable/unrun. Python3.13/3.15 are excluded by package metadata; no blanket compatibility claim."
+  },
+  {
+    "id": "D04",
+    "scenario": "Core-only, watch, image-similarity, conversion and integration extras",
+    "requirement": "Correct optional imports and capability reporting; no heavy dependency required for unrelated inspect operation.",
+    "status": "verified",
+    "evidence": "Post-review installed-final-{all,core,covers,watch,image-similarity,conversion,integrations}.json each PASS selected-lock inventory, 55 isolated cold imports, targeted absent-capability errors and actual selected work. All-extra proof is separate from each capability-only environment; only the app package was refreshed."
+  },
+  {
+    "id": "D05",
+    "scenario": "Container starts with mounted config/data and non-root ownership",
+    "requirement": "Correct permissions, config/resources, no baked secrets or source-root assumptions.",
+    "status": "verified",
+    "evidence": "Current container-advisor-pr-proof.json PASS on CPython3.14.8/UID/GID1000/network-none/disposable volumes: preview unchanged, WebP/source retention, UMASK027/0640, PID1/literalargv/invalid008 and named optional refusals. WheelSHA1d6c0b0100fbd29712a5119dbc0844c869ae538e84a61d3c4ba146c49c36def8 and sourceSHA8c1029b29cdf7b680f75deebb6b1d3c3fb2a15b126414a272d95773f8a9303d8 bind all seven host environments and actual image. All11 layers/16820 paths, exact environment values/full config/history, bounded owned content and actual OCI provenance parameters pass; scope is not exhaustive third-party secret assurance."
+  },
+  {
+    "id": "D06",
+    "scenario": "Container stop/restart and independently running helper",
+    "requirement": "Signals forwarded; bounded shutdown; helper failure visible; no orphan processes.",
+    "status": "verified",
+    "evidence": "Current actual image proof passes watch/qbit readiness with two initialized children, bounded SIGTERM143 and both reaped; two fresh helper401 rounds exit1/reap both with zero mutatorPOSTs. Current1545-source gate includes readiness-then-zero watcher exit and actual per-job caller-flag/unrelated-child/attached-detached cleanup regressions. Dedicated supervisors own job descendants rather than mutate the embedding process. Read-only torrents/info POST is not mutation."
+  },
+  {
+    "id": "D07",
+    "scenario": "Logging rotates; errors and counts after partial failures",
+    "requirement": "Accurate committed/planned/skipped/failed counts; no success inflation (R25).",
+    "status": "verified",
+    "evidence": "Current1508 source gate PASS rotation/profile/partial counts. Three actual root-lock fsyncEIO regressions fail before repair; four apply/recover/new/complete paths PASS0.13s afterward, preserving counts/plans/events/repeat identity while reporting failure. Actual installed lock-release CLI proves committed0->1 with real decoded publication, failed1/nonzero exit retained, repeated recovery0."
+  },
+  {
+    "id": "D08",
+    "scenario": "Static checks after final integration",
+    "requirement": "Formatting/lint/type checks genuinely executed; no blanket ignores to hide regressions.",
+    "status": "partial",
+    "evidence": "Final offline source PASS1508/145.51s, strict mypy PASS64 source/tool files and frozen-excluded Ruff lint/export PASS. Actual final read-only formatter exits1 in0.24s,119 files require format/seven conform (artifact653); unrelated styles are not swept/ignored. Shared stage predicate resolves the organizer complexity error without suppression, LSPzero errors/13warnings. Typing/lint and LSP warnings are distinct; no all-static-green claim."
+  },
+  {
+    "id": "D09",
+    "scenario": "Fast tests versus full original corpus",
+    "requirement": "Both reported separately with skips/failures; no full-parity claim from selected sample.",
+    "status": "verified",
+    "evidence": "Frozen fast/all remain separate characterized runs with the exact four failures and two not_asserted exercises. legacy-interpreter-repaired.json validates 44465 frozen rows; modern.json accounts for 44714 total, 249 exclusions, 44465 eligible, and four explicit-set corrections. Recorded 1502 source tests pass without inventing labels beyond the three populated fields."
+  },
+  {
+    "id": "D10",
+    "scenario": "Measured benchmark compared on same fixture/policy/environment",
+    "requirement": "Wall time, memory and work counts reproducible; no unsupported speedup claims.",
+    "status": "verified",
+    "evidence": "Current benchmark-advisor-pr-10-1000.json PASS20 actual application cases/five pairs per size in3002.85s under unchanged900s case deadlines.57 installed runtime member hashes equal currentwheel1d6c0b01. Exact originals/output/pixels agree across all cases;10/1000 originals and11/1100 images, modern1/100 complete groups/failed0. Frozen/modern wall medians0.8452/5.6771s at10 and1.5023/590.5700s at1000, ranges/RSS/work scopes recorded. Modern ZIP/open/decode/scan counts unchanged50/526/3022848/3 at10 and5000/52600/302284800/201 at1000; supervisor+fork lifecycles yield63/6201 Python processes. Slower observed safety work, not equal-work/speedup/scalability. Host contention/sandbox observer/tmpfs limits explicit; earlier900s failures retained."
+  },
+  {
+    "id": "D11",
+    "scenario": "New filename/schema/API/settings migration docs",
+    "requirement": "Examples execute on installed package and intentional changes have migration instructions.",
+    "status": "verified",
+    "evidence": "documentation-numeric-proof.json PASS records 26 real installed commands outside checkout covering README/configuration/recovery examples: inspect/extract preview/apply, exclusive plan/profile with readable pstats, recover preview/apply counting zero when complete, watch JSONL, qbit read-only loopback startup, help/doctor, source precedence/collections/paths, and AST literal migration with 0600 output and unchanged input. Intentional changes remain documented."
+  },
+  {
+    "id": "D12",
+    "scenario": "Final source edit after a successful test run",
+    "requirement": "Rerun relevant/full release gates so evidence matches final revision.",
+    "status": "verified",
+    "evidence": "Final production source PASS1508/145.51s, XML tests-source-stage-predicate-final.xml; strict64-file mypy and frozen-excluded Ruff/export PASS. Seven final environments, real source-identical image and eleven-layer audit PASS. Five counterbalanced actual10/1000-book pairs PASS with exact outputs/originals and unchanged900s deadline. Development-only documentation membership change passes30 package tests and actual wheel-from-sdist build with byte-identical tested wheelf94889b. Final formatter119 failure and external/history limits remain explicit; no stale-snapshot or all-gates-green claim."
+  },
+  {
+    "id": "D13",
+    "scenario": "Package manifest and reports",
+    "requirement": "No personal library contents, credentials, scratch, earlier wheels or handoff references unintentionally shipped at runtime.",
+    "status": "verified",
+    "evidence": "Current runtime wheel excludes development/scratch/frozen executables and retains blank resources. All11 saved runtime layers/16820 paths examined;57 exact owned package/resource members and exact launchers, installer wheel and byte-identical uv0.11.32 Docker export. Benign ignore marker no longer copied. Five named credential patterns match zero of3631121 owned bytes under32MiB/member and64MiB total caps. Exact base-plus-four-override env, full config delta/13 source-derived history instructions,9 bounded JSON metadata payloads16056 bytes and actual SLSAv1 public parameters pass.55 bytecode members independently recompile equal; entrypoint matches actual pip26.2.1 producer. Development sdist docs/frozen-input closure is recorded separately. No exhaustive third-party entropy/vulnerability claim."
+  },
+  {
+    "id": "D14",
+    "scenario": "Every feature/settings/symbol matrix row audited",
+    "requirement": "Implemented + connected + verified or explicit approved difference/gap; nothing silently omitted.",
+    "status": "verified",
+    "evidence": "Exact original census retains330 path/name/span identities,53 literal settings,129 initialized rows/128 names,66 feature rows and168 unique criteria. All555 persisted advisor notes have one disposition in advisor-review.json:299 resolved,106 superseded,91 procedural,29 limitations,19 nonfindings,11 retracted. Seven surviving defects fixed with source1545/strict62/lint/corpus/seven installs/actual image and runtime proof; current paired book/package closure is recorded separately without borrowing historical source hashes. Six partial/three characterized/one blocked remain explicit; inventory/review accounting is not all-platform acceptance."
+  }
+]

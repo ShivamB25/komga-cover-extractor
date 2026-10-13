@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "mode": "fast",
+  "python": "3.14.6",
+  "source_hashes": {},
+  "tests": [],
+  "corpus": null,
+  "adaptations": [
+    {
+      "name": "launcher",
+      "status": "blocked",
+      "detail": "probe produced no structured output; sandbox diagnostics: Traceback (most recent call last):\n  File \"/repo/tools/legacy_probe.py\", line 1147, in <module>\n    raise SystemExit(run_probe())\n                     ~~~~~~~~~^^\n  File \"/repo/tools/legacy_probe.py\", line 1142, in run_probe\n    print(json.dumps(result, ensure_ascii=False, sort_keys=True, default=str))\n          ^^^^\nNameError: name 'json' is not defined. Did you forget to import 'json'?\n"
+    }
+  ],
+  "error": "probe produced no structured output; sandbox diagnostics: Traceback (most recent call last):\n  File \"/repo/tools/legacy_probe.py\", line 1147, in <module>\n    raise SystemExit(run_probe())\n                     ~~~~~~~~~^^\n  File \"/repo/tools/legacy_probe.py\", line 1142, in run_probe\n    print(json.dumps(result, ensure_ascii=False, sort_keys=True, default=str))\n          ^^^^\nNameError: name 'json' is not defined. Did you forget to import 'json'?\n"
+}

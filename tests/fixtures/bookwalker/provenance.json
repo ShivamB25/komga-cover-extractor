@@ -1,0 +1,8 @@
+{
+  "kind": "synthetic",
+  "source": "Author-created offline HTML. No BookWalker response was fetched.",
+  "selector_evidence": "Original checkout komga_cover_extractor.py lines 9953-9957, 10011-10134, 10287-10388.",
+  "price_evidence": "Synthetic schema.org itemprop=price and priceCurrency observations. Original reader fabricated 0.00 and did not inspect a price selector.",
+  "clock": "2026-10-13",
+  "limitations": "These fixtures characterize the inspected selectors and error handling, not the current public website DOM. A permitted versioned public response fixture remains an external verification prerequisite."
+}

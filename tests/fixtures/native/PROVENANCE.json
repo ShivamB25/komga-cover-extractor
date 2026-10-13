@@ -1,0 +1,23 @@
+{
+  "repository": "https://github.com/markokr/rarfile",
+  "version": "4.2",
+  "revision": "984fcbeae25de2ef5a85745e8938406dd896fab6",
+  "source_url_template": "https://raw.githubusercontent.com/markokr/rarfile/984fcbeae25de2ef5a85745e8938406dd896fab6/test/files/{name}",
+  "license": "ISC",
+  "license_file": "LICENSE",
+  "description": "Unmodified genuine RAR3/RAR5 archives from the locked rarfile version's test corpus. Upstream Git blob identities were checked when acquired. Positive decoding tests require RARLAB unrar; absence is an explicit prerequisite skip, not parity evidence. Generated 7z fixtures are created by tests only, never disguised ZIP files.",
+  "files": [
+    {"name": "rar5-subdirs.rar", "git_blob_sha1": "34448fe65cd3d9f66fa9458f97bea7275bde51fa", "sha256": "4449d0e82e09f52af23a11cd84904625de8b15beafcf73e5c30dc3296beae0b2", "bytes": 542},
+    {"name": "rar5-solid.rar", "git_blob_sha1": "277cfe7206417067faf2fbd7c3f0bd7a1bf878a2", "sha256": "d97d23b2edee9a7daa49e45015ea72aa3f162efeb0abaf559740ab797276203b", "bytes": 169},
+    {"name": "rar3-comment-plain.rar", "git_blob_sha1": "29d8cb00d605e93e3cdfae4a198a9e3ec7424dfb", "sha256": "224a3f0aacab5cbb140b72dde616280a871589f251b9147bdb55b49651661813", "bytes": 300},
+    {"name": "rar5-dups.rar", "git_blob_sha1": "8085bcd0c5a826ab78c46d83d252ac3d7f8f0513", "sha256": "60a752ef7f0373d881171dcb068810fe12a698b53f2bbce93ae4fb1b4e68cf8e", "bytes": 594},
+    {"name": "rar5-hlink.rar", "git_blob_sha1": "bc1d2f321ed95a0002fe734ffbacdd82b47dcb9e", "sha256": "c7c2db6fb021e89198da80d4b903d4a46b692c2f31fec64cb53c7e37af7a51f4", "bytes": 230},
+    {"name": "rar5-symlink-unix.rar", "git_blob_sha1": "b32a508b7df990ee7c82faa9d696d3f8e2993c16", "sha256": "681bc8238f2085f99737a0c41a5595096863bb460075e3cf70cba0f7709aa9b7", "bytes": 195},
+    {"name": "rar5-symlink-win.rar", "git_blob_sha1": "27c0994c09f1e51bf9f157e226e143f0308acf4c", "sha256": "f10df8bc1e2cf07a7ef127627e5cc526a872f97bbfc1c14145bbe8aececdabe0", "bytes": 542},
+    {"name": "rar5-psw.rar", "git_blob_sha1": "f01e63aac6e3f899cf30c505fcf50bef46e44154", "sha256": "b6840e95152a1c3b5acd736dc34f988509866f04158b67da1b5a29e166a31355", "bytes": 2403},
+    {"name": "rar5-hpsw.rar", "git_blob_sha1": "ed6d2f1b4bfb7555897312f8687b6026bb2ed432", "sha256": "9aff93dfd85b1e44daeef233105831999a2076299997b7790e1cf1fd557a4457", "bytes": 2590},
+    {"name": "rar5-vols.part1.rar", "git_blob_sha1": "0926f2f8f6d74bd1a7e8c4c1ebe74432c0b8d4e2", "sha256": "c997e965ad319646e3bead59b372a9bd87459aa471c8bc8ad02267d43e328c2f", "bytes": 102400},
+    {"name": "rar5-vols.part2.rar", "git_blob_sha1": "d4f55a2f859d0c7b422b99e111db4fc5e8b7e34f", "sha256": "484343c1ca19e1eac8103946f1c0e7746d6df5d995f8f55395f03786ad34e709", "bytes": 102400},
+    {"name": "rar5-vols.part3.rar", "git_blob_sha1": "ba6e9924a6db984d321364b8788301cda8c3bfba", "sha256": "0b117cf1cb7b46877124d5f07ebc45580b4a5feadc24f5578196036a32c9eadc", "bytes": 11384}
+  ]
+}

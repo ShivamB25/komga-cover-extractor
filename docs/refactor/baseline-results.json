@@ -1,0 +1,2774 @@
+{
+  "adaptations": [
+    {
+      "detail": "adapted fixture policy ignored_folder_names=['test']; completed without diagnostics",
+      "name": "test_remove_ignored_folders",
+      "status": "pass"
+    },
+    {
+      "detail": "adapted fixture call binding name, fixture-root and chapter_number for 108 original calls; completed without diagnostics",
+      "name": "test_get_series_name_from_chapter",
+      "status": "pass"
+    }
+  ],
+  "corpus": {
+    "detail": "reproduced original validate_csv normalization for Release Number, Series Name and File Type",
+    "legacy_validate_csv": {
+      "detail": "bounded original validate_csv capture; stdout='[1/44714] [HD] Chainsaw Man 110 (2022) (Digital).cbz\\n[2/44714] [HD] Chainsaw Man 111 (2022) (Digital).cbz\\n[3/44714] [HD] Chainsaw Man 112 (2022) (Digital).cbz\\n[4/44714] [HD] Chainsaw Man 113 (2022) (Digital).cbz\\n[5/44714] [WN] Shikkaku Mon no Saikyou Kenja - Volume 01.epub\\n[6/44714] [WN] Shikkaku Mon no Saikyou Kenja - Volume 02.epub\\n[7/44714] [WN] Shikkaku Mon no Saikyou Kenja - Volume 03.epub\\n[8/44714] [WN] Shikkaku Mon no Saikyou Kenja - Volume 04.epub\\n[9/44714] [WN] Shikkaku Mon no Saikyou Kenja - Volume 05.epub\\n[10/44714] [WN] Shikkaku Mon no Saikyou Kenja - Volume 06.epub\\n[11/44714] [WN] Shikkaku Mon no Saikyou Kenja - Volume 07.epub\\n[12/44714] [WN] Shikkaku Mon no Saikyou Kenja - Volume 08 (v2).epub\\n[13/44714] [WN] Shikkaku Mon no Saikyou Kenja - Volume 09.epub\\n[14/44714] [WN] Shikkaku Mon no Saikyou Kenja - Volume 10.epub\\n[15/44714] [WN] Shikkaku Mon no Saikyou Kenja - Volume 11 (inc).epub\\n[16/44714] 【OSHI NO KO】 001.cbz\\n[17/44714] 【OSHI NO KO】 002.cbz\\n[18/44714] 【OSHI NO KO】 003.cbz\\n[19/44714] 【OSHI NO KO】 004.cbz\\n[20/44714] 【OSHI NO KO】 005.cbz\\n[21/44714] 【OSHI NO KO】 006.cbz\\n[22/44714] 【OSHI NO KO】 007.cbz\\n[23/44714] 【OSHI NO KO】 008.cbz\\n[24/44714] 【OSHI NO KO】 009.cbz\\n[25/44714] 【OSHI NO KO】 010.cbz\\n[26/44714] 【OSHI NO KO】 011.cbz\\n[27/44714] 【OSHI NO KO】 012.cbz\\n[28/44714] 【OSHI NO KO】 013.cbz\\n[29/44714] 【OSHI NO KO】 014.cbz\\n[30/44714] 【OSHI NO KO】 015.cbz\\n[31/44714] 【OSHI NO KO】 016.cbz\\n[32/44714] 【OSHI NO KO】 017.cbz\\n[33/44714] 【OSHI NO KO】 018.cbz\\n[34/44714] 【OSHI NO KO】 019.cbz\\n[35/44714] 【OSHI NO KO】 020.cbz\\n[36/44714] 【OSHI NO KO】 021.cbz\\n[37/44714] 【OSHI NO KO】 022.cbz\\n[38/44714] 【OSHI NO KO】 023.cbz\\n[39/44714] 【OSHI NO KO】 024.cbz\\n[40/44714] 【OSHI NO KO】 025.cbz\\n[41/44714] 【OSHI NO KO】 026.cbz\\n[42/44714] 【OSHI NO KO】 027.cbz\\n[43/44714] 【OSHI NO KO】 028.cbz\\n[44/44714] 【OSHI NO KO】 029.cbz\\n[45/44714] 【OSHI NO KO】 030.cbz\\n[46/44714] 【OSHI NO KO】 031.cbz\\n[47/44714] 【OSHI NO KO】 032.cbz\\n[48/44714] 【OSHI NO KO】 033.cbz\\n[49/44714] 【OSHI NO KO】 034.cbz\\n[50/44714] 【OSHI NO KO】 035.cbz\\n[51/44714] 【OSHI NO KO】 036.cbz\\n[52/44714] 【OSHI NO KO】 037.cbz\\n[53/44714] 【OSHI NO KO】 038.cbz\\n[54/44714] 【OSHI NO KO】 039.cbz\\n[55/44714] 【OSHI NO KO】 040.cbz\\n[56/44714] 【OSHI NO KO】 041.cbz\\n[57/44714] 【OSHI NO KO】 042.cbz\\n[58/44714] 【OSHI NO KO】 043.cbz\\n[59/44714] 【OSHI NO KO】 044.cbz\\n[60/44714] 【OSHI NO KO】 045.cbz\\n[61/44714] 【OSHI NO KO】 046.cbz\\n[62/44714] 【OSHI NO KO】 047.cbz\\n[63/44714] 【OSHI NO KO】 048.cbz\\n[64/44714] 【OSHI NO KO】 049.cbz\\n[65/44714] 【OSHI NO KO】 050.cbz\\n[66/44714] 【OSHI NO KO】 051.cbz\\n[67/44714] 【OSHI NO KO】 052.cbz\\n[68/44714] 【OSHI NO KO】 053.cbz\\n[69/44714] 【OSHI NO KO】 054.cbz\\n[70/44714] 【OSHI NO KO】 055.cbz\\n[71/44714] 【OSHI NO KO】 056.cbz\\n[72/44714] 【OSHI NO KO】 057.cbz\\n[73/44714] 【OSHI NO KO】 058.cbz\\n[74/44714] 【OSHI NO KO】 059.cbz\\n[75/44714] 【OSHI NO KO】 060.cbz\\n[76/44714] 【OSHI NO KO】 061.cbz\\n[77/44714] 【OSHI NO KO】 062.cbz\\n[78/44714] 【OSHI NO KO】 063.cbz\\n[79/44714] 【OSHI NO KO】 064.cbz\\n[80/44714] 【OSHI NO KO】 065.cbz\\n[81/44714] 【OSHI NO KO】 066.cbz\\n[82/44714] 【OSHI NO KO】 067.cbz\\n[83/44714] 【OSHI NO KO】 068.cbz\\n[84/44714] 【OSHI NO KO】 069.cbz\\n[85/44714] 【OSHI NO KO】 070.cbz\\n[86/44714] 【OSHI NO KO】 071.cbz\\n[87/44714] 【OSHI NO KO】 072.cbz\\n[88/44714] 【OSHI NO KO】 073.cbz\\n[89/44714] 【OSHI NO KO】 074.cbz\\n[90/44714] 【OSHI NO KO】 075.cbz\\n[91/44714] 【OSHI NO KO】 076.cbz\\n[92/44714] 【OSHI NO KO】 077.cbz\\n[93/44714] 【OSHI NO KO】 078.cbz\\n[94/44714] 【OSHI NO KO】 079.cbz\\n[95/44714] 【OSHI NO KO】 080.cbz\\n[96/44714] 【OSHI NO KO】 081.cbz\\n[97/44714] 【OSHI NO KO】 082.cbz\\n[98/44714] 【OSHI NO KO】 083.cbz\\n[99/44714] 【OSHI NO KO】 084.cbz\\n[100/44714] 【OSHI NO KO】 085.cbz\\n[101/44714] 【OSHI NO KO】 086.cbz\\n[102/44714] 【OSHI NO KO】 087.cbz\\n[103/44714] 【OSHI NO KO】 088.cbz\\n[104/44714] 【OSHI NO KO】 089.cbz\\n[105/44714] 【OSHI NO KO】 090.cbz\\n[106/44714] 【OSHI NO KO】 091.cbz\\n[107/44714] 【OSHI NO KO】 092.cbz\\n[108/44714] 【OSHI NO KO】 093.cbz\\n[109/44714] 【OSHI NO KO】 094.cbz\\n[110/44714] 【OSHI NO KO】 095.cbz\\n[111/44714] 【OSHI NO KO】 096.cbz\\n[112/44714] 【OSHI NO KO】 097.cbz\\n[113/44714] 【OSHI NO KO】 098.cbz\\n[114/44714] 【OSHI NO KO】 099.cbz\\n[115/44714] 【OSHI NO KO】 100.cbz\\n[116/44714] 【OSHI NO KO】 101.cbz\\n[117/44714] 【OSHI NO KO】 102.cbz\\n[118/44714] 【OSHI NO KO】 142 - RESPONSIBILITY (2024) (Digital) (Rillant).cbz\\n[119/44714] 【OSHI NO KO】 143 - BLIND FOLLOWER (2024) (Digital) (Rillant).cbz\\n[120/44714] 001 -  My Awkward Senpai Ch.1 [Comikey].cbz\\n[121/44714] 001 -  The Girl I Like Forgot Her Glasses Ch.1 [Comikey].cbz\\n[122/44714] 001 - Girl Crush 01 (Digital) [Shizu].cbz\\n[123/44714] 001 - The Ice Guy and His Cool Female Colleague Ch.1 [Comikey].cbz\\n[124/44714] 001.1 - Asahina Wakaba & Her Chubby-Chubby Boyfriend Ch.1.1 [Comikey].cbz\\n[125/44714] 001.1 - Bottom-Tier Character Tomozaki Ch.1.1 [Comikey].cbz\\n[126/44714] 001.1 - Rust-Eater Bisco Ch.1.1 [Comikey].cbz\\n[127/44714] 001.2 - Asahina Wakaba & Her Chubby-Chubby Boyfriend Ch.1.2 [Comikey].cbz\\n[128/44714] 001.2 - Bottom-Tier Character Tomozaki Ch.1.2 [Comikey].cbz\\n[129/44714] 001.2 - Rust-Eater Bisco Ch.1.2 [Comikey].cbz\\n[130/44714] 001.3 - Asahina Wakaba & Her Chubby-Chubby Boyfriend Ch.1.3 [Comikey].cbz\\n[131/44714] 001.3 - Bottom-Tier Character Tomozaki Ch.1.3 [Comikey].cbz\\n[132/44714] 002 -  My Awkward Senpai Ch.2 [Comikey].cbz\\n[133/44714] 002 - Girl Crush 02 (Digital) [Shizu].cbz\\n[134/44714] 002 - Rust-Eater Bisco Ch.2 [Comikey].cbz\\n[135/44714] 002 - The Girl I Like Forgot Her Glasses Ch.2 [Comikey].cbz\\n[136/44714] 002 - The Ice Guy and His Cool Female Colleague Ch.2 [Comikey].cbz\\n[137/44714] 002.1 - Asahina Wakaba & Her Chubby-Chubby Boyfriend Ch.2.1 [Comikey].cbz\\n[138/44714] 002.1 - Bottom-Tier Character Tomozaki Ch.2.1 [Comikey].cbz\\n[139/44714] 002.2 - Asahina Wakaba & Her Chubby-Chubby Boyfriend Ch.2.2 [Comikey].cbz\\n[140/44714] 002.2 - Bottom-Tier Character Tomozaki Ch.2.2 [Comikey].cbz\\n[141/44714] 002.3 - Bottom-Tier Character Tomozaki Ch.2.3 [Comikey].cbz\\n[142/44714] 003 -  My Awkward Senpai Ch.3 [Comikey].cbz\\n[143/44714] 003 - Girl Crush 03 (Digital) [Shizu].cbz\\n[144/44714] 003 - Rust-Eater Bisco Ch.3 [Comikey].cbz\\n[145/44714] 003 - The Girl I Like Forgot Her Glasses Ch.3 [Comikey].cbz\\n[146/44714] 003 - The Ice Guy and His Cool Female Colleague Ch.3 [Comikey].cbz\\n[147/44714] 003.1 - Asahina Wakaba & Her Chubby-Chubby Boyfriend Ch.3.1 [Comikey].cbz\\n[148/44714] 003.1 - Bottom-Tier Character Tomozaki Ch.3.1 [Comikey].cbz\\n[149/44714] 003.2 - Asahina Wakaba & Her Chubby-Chubby Boyfriend Ch.3.2 [Comikey].cbz\\n[150/44714] 003.2 - Bottom-Tier Character Tomozaki Ch.3.2 [Comikey].cbz\\n[151/44714] 003.3 - Asahina Wakaba & Her Chubby-Chubby Boyfriend Ch.3.3 [Comikey].cbz\\n[152/44714] 004 -  My Awkward Senpai Ch.4 [Comikey].cbz\\n[153/44714] 004 - Girl Crush 04 (Digital) [Shizu].cbz\\n[154/44714] 004 - The Girl I Like Forgot Her Glasses Ch.4 [Comikey].cbz\\n[155/44714] 004 - The Ice Guy and His Cool Female Colleague Ch.4 [Comikey].cbz\\n[156/44714] 004.1 - Asahina Wakaba & Her Chubby-Chubby Boyfriend Ch.4.1 [Comikey].cbz\\n[157/44714] 004.1 - Bottom-Tier Character Tomozaki Ch.4.1 [Comikey].cbz\\n[158/44714] 004.1 - Rust-Eater Bisco Ch.4.1 [Comikey].cbz\\n[159/44714] 004.2 - Asahina Wakaba & Her Chubby-Chubby Boyfriend Ch.4.2 [Comikey].cbz\\n[160/44714] 004.2 - Bottom-Tier Character Tomozaki Ch.4.2 [Comikey].cbz\\n[161/44714] 004.2 - Rust-Eater Bisco Ch.4.2 [Comikey].cbz\\n[162/44714] 004.3 - Rust-Eater Bisco Ch.4.3 [Comikey].cbz\\n[163/44714] 005 -  My Awkward Senpai Ch.5 [Comikey].cbz\\n[164/44714] 005 - Girl Crush 05 (Digital) [Shizu].cbz\\n[165/44714] 005 - The Girl I Like Forgot Her Glasses Ch.5 [Comikey].cbz\\n[166/44714] 005 - The Ice Guy and His Cool Female Colleague Ch.5 [Comikey].cbz\\n[167/44714] 005.1 - Bottom-Tier Character Tomozaki Ch.5.1 [Comikey].cbz\\n[168/44714] 005.1 - Rust-Eater Bisco Ch.5.1 [Comikey].cbz\\n[169/44714] 005.2 - Bottom-Tier Character Tomozaki Ch.5.2 [Comikey].cbz\\n[170/44714] 005.2 - Rust-Eater Bisco Ch.5.2 [Comikey].cbz\\n[171/44714] 005.3 - Rust-Eater Bisco Ch.5.3 [Comikey].cbz\\n[172/44714] 005.5 - The Ice Guy and His Cool Female Colleague Ch.5.5 [Comikey].cbz\\n[173/44714] 006 -  My Awkward Senpai Ch.6 [Comikey].cbz\\n[174/44714] 006 - Girl Crush 06 (Digital) [Shizu].cbz\\n[175/44714] 006 - The Girl I Like Forgot Her Glasses Ch.6 [Comikey].cbz\\n[176/44714] 006 - The Ice Guy and His Cool Female Colleague Ch.6 [Comikey].cbz\\n[177/44714] 006.1 - Bottom-Tier Character Tomozaki Ch.6.1 [Comikey].cbz\\n[178/44714] 006.1 - Rust-Eater Bisco Ch.6.1 [Comikey].cbz\\n[179/44714] 006.2 - Bottom-Tier Character Tomozaki Ch.6.2 [Comikey].cbz\\n[180/44714] 006.2 - Rust-Eater Bisco Ch.6.2 [Comikey].cbz\\n[181/44714] 006.3 - Rust-Eater Bisco Ch.6.3 [Comikey].cbz\\n[182/44714] 007 -  My Awkward Senpai Ch.7 [Comikey].cbz\\n[183/44714] 007 - Girl Crush 07 (Digital) [Shizu].cbz\\n[184/44714] 007 - The Girl I Like Forgot Her Glasses Ch.7 [Comikey].cbz\\n[185/44714] 007 - The Ice Guy and His Cool Female Colleague Ch.7 [Comikey].cbz\\n[186/44714] 008 -  My Awkward Senpai Ch.8 [Comikey].cbz\\n[187/44714] 008 -  The Girl I Like Forgot Her Glasses Ch.8 [Comikey].cbz\\n[188/44714] 008 - Girl Crush 08 (Digital) [Shizu].cbz\\n[189/44714] 008 - The Ice Guy and His Cool Female Colleague Ch.8 [Comikey].cbz\\n[190/44714] 009 -  The Girl I Like Forgot Her Glasses Ch.9 [Comikey].cbz\\n[191/44714] 009 - Girl Crush 09 (Digital) [Shizu].cbz\\n[192/44714] 009 - My Awkward Senpai Ch.9 [Comikey].cbz\\n[193/44714] 009 - The Ice Guy and His Cool Female Colleague Ch.9 [Comikey].cbz\\n[194/44714] 010 - Girl Crush 10 (Digital) [Shizu].cbz\\n[195/44714] 010 - My Awkward Senpai Ch.10 [Comikey].cbz\\n[196/44714] 010 - The Girl I Like Forgot Her Glasses Ch.10 [Comikey].cbz\\n[197/44714] 010 - The Ice Guy and His Cool Female Colleague Ch.10 [Comikey].cbz\\n[198/44714] 011 - Girl Crush 11 (Digital) [Shizu].cbz\\n[199/44714] 011 - My Awkward Senpai Ch.11 [Comikey].cbz\\n[200/44714] 011 - The Girl I Like Forgot Her Glasses Ch.11 [Comikey].cbz\\n[201/44714] 011 - The Ice Guy and His Cool Female Colleague Ch.11 [Comikey].cbz\\n[202/44714] 012 - Girl Crush 12 (Digital) [Pa1n].cbz\\n[203/44714] 012 - My Awkward Senpai Ch.12 [Comikey].cbz\\n[204/44714] 012 - The Girl I Like Forgot Her Glasses Ch.12 [Comikey].cbz\\n[205/44714] 012 - The Ice Guy and His Cool Female Colleague Ch.12 [Comikey].cbz\\n[206/44714] 013 - Girl Crush 13 (Digital) [Pa1n].cbz\\n[207/44714] 013 - My Awkward Senpai Ch.13 [Comikey].cbz\\n[208/44714] 013 - The Girl I Like Forgot Her Glasses Ch.13 [Comikey].cbz\\n[209/44714] 013 - The Ice Guy and His Cool Female Colleague Ch.13 [Comikey].cbz\\n[210/44714] 013.5 - The Ice Guy and His Cool Female Colleague Ch.13.5 [Comikey].cbz\\n[211/44714] 014 - Girl Crush 14 (Digital) [Pa1n].cbz\\n[212/44714] 014 - My Awkward Senpai Ch.14 [Comikey].cbz\\n[213/44714] 014 - The Girl I Like Forgot Her Glasses Ch.14 [Comikey].cbz\\n[214/44714] 014 - The Ice Guy and His Cool Female Colleague Ch.14 [Comikey].cbz\\n[215/44714] 014.5 - The Girl I Like Forgot Her Glasses Ch.14.5 [Comikey].cbz\\n[216/44714] 015 - Girl Crush 15 (Digital) [Pa1n].cbz\\n[217/44714] 015 - My Awkward Senpai Ch.15 [Comikey].cbz\\n[218/44714] 015 - The Girl I Like Forgot Her Glasses Ch.15 [Comikey].cbz\\n[219/44714] 015 - The Ice Guy and His Cool Female Colleague Ch.15 [Comikey].cbz\\n[220/44714] 015.5 - The Ice Guy and His Cool Female Colleague Ch.15.5 [Comikey].cbz\\n[221/44714] 016 - Girl Crush 16 (Digital) [Pa1n].cbz\\n[222/44714] 016 - My Awkward Senpai Ch.16 [Comikey].cbz\\n[223/44714] 016 - The Girl I Like Forgot Her Glasses Ch.16 [Comikey].cbz\\n[224/44714] 016 - The Ice Guy and His Cool Female Colleague Ch.16 [Comikey].cbz\\n[225/44714] 016.5 - My Awkward Senpai Ch.16.5 [Comikey].cbz\\n[226/44714] 017 - Girl Crush 17 (Digital) [Pa1n].cbz\\n[227/44714] 017 - My Awkward Senpai Ch.17 [Comikey].cbz\\n[228/44714] 017 - The Girl I Like Forgot Her Glasses Ch.17 [Comikey].cbz\\n[229/44714] 017 - The Ice Guy and His Cool Female Colleague Ch.17 [Comikey].cbz\\n[230/44714] 018 - Girl Crush 18 (Digital) [Pa1n].cbz\\n[231/44714] 018 - My Awkward Senpai Ch.18 [Comikey].cbz\\n[232/44714] 018 - The Girl I Like Forgot Her Glasses Ch.18 [Comikey].cbz\\n[233/44714] 018 - The Ice Guy and His Cool Female Colleague Ch.18 [Comikey].cbz\\n[234/44714] 019 - Girl Crush 19 (Digital) [Pa1n].cbz\\n[235/44714] 019 - My Awkward Senpai Ch.19 [Comikey].cbz\\n[236/44714] 019 - The Girl I Like Forgot Her Glasses Ch.19 [Comikey].cbz\\n[237/44714] 019 - The Ice Guy and His Cool Female Colleague Ch.19 [Comikey].cbz\\n[238/44714] 020 - Girl Crush 20 (Digital) [Pa1n].cbz\\n[239/44714] 020 - My Awkward Senpai Ch.20 [Comikey].cbz\\n[240/44714] 020 - The Girl I Like Forgot Her Glasses Ch.20 [Comikey].cbz\\n[241/44714] 020 - The Ice Guy and His Cool Female Colleague Ch.20 [Comikey].cbz\\n[242/44714] 020.5 - The Ice Guy and His Cool Female Colleague Ch.20.5 [Comikey].cbz\\n[243/44714] 021 - Girl Crush 21 (Digital) [Pa1n].cbz\\n[244/44714] 021 - My Awkward Senpai Ch.21 [Comikey].cbz\\n[245/44714] 021 - The Girl I Like Forgot Her Glasses Ch.21 [Comikey].cbz\\n[246/44714] 021 - The Ice Guy and His Cool Female Colleague Ch.21 [Comikey].cbz\\n[247/44714] 022 - Girl Crush 22 (Digital) [Pa1n].cbz\\n[248/44714] 022 - My Awkward Senpai Ch.22 [Comikey].cbz\\n[249/44714] 022 - The Girl I Like Forgot Her Glasses Ch.22 [Comikey].cbz\\n[250/44714] 022 - The Ice Guy and His Cool Female Colleague Ch.22 [Comikey].cbz\\n[251/44714] 023 - Girl Crush 23 (Digital) [Pa1n].cbz\\n[252/44714] 023 - My Awkward Senpai Ch.23 [Comikey].cbz\\n[253/44714] 023 - The Girl I Like Forgot Her Glasses Ch.23 [Comikey].cbz\\n[254/44714] 023 - The Ice Guy and His Cool Female Colleague Ch.23 [Comikey].cbz\\n[255/44714] 023.5 - The Ice Guy and His Cool Female Colleague Ch.23.5 [Comikey].cbz\\n[256/44714] 024 - Girl Crush 24 (Digital) [Pa1n].cbz\\n[257/44714] 024 - My Awkward Senpai Ch.24 [Comikey].cbz\\n[258/44714] 024 - The Girl I Like Forgot Her Glasses Ch.24 [Comikey].cbz\\n[259/44714] 024 - The Ice Guy and His Cool Female Colleague Ch.24 [Comikey].cbz\\n[260/44714] 025 - Girl Crush 25 (Digital) [Pa1n].cbz\\n[261/44714] 025 - My Awkward Senpai Ch.25 [Comikey].cbz\\n[262/44714] 025 - The Girl I Like Forgot Her Glasses Ch.25 [Comikey].cbz\\n[263/44714] 025 - The Ice Guy and His Cool Female Colleague Ch.25 [Comikey].cbz\\n[264/44714] 026 - Girl Crush 26 (Digital) [Pa1n].cbz\\n[265/44714] 026 - My Awkward Senpai Ch.26 [Comikey].cbz\\n[266/44714] 026 - The Girl I Like Forgot Her Glasses Ch.26 [Comikey].cbz\\n[267/44714] 027 - Girl Crush 27 (Digital) [Pa1n].cbz\\n[268/44714] 027 - My Awkward Senpai Ch.27 [Comikey].cbz\\n[269/44714] 027 - The Girl I Like Forgot Her Glasses Ch.27 [Comikey].cbz\\n[270/44714] 028 - Girl Crush 28 (Digital) [Pa1n].cbz\\n[271/44714] 028 - My Awkward Senpai Ch.28 [Comikey].cbz\\n[272/44714] 028 - The Girl I Like Forgot Her Glasses Ch.28 [Comikey].cbz\\n[273/44714] 028.5 - The Girl I Like Forgot Her Glasses Ch.28.5 [Comikey].cbz\\n[274/44714] 029 - Girl Crush 29 (Digital) [Pa1n].cbz\\n[275/44714] 029 - My Awkward Senpai Ch.29 [Comikey].cbz\\n[276/44714] 030 - Girl Crush 30 (Digital) [Pa1n].cbz\\n[277/44714] 03b. Yu-Gi-Oh! Transcend Game (2016) (Digital).cbz\\n  - Skipping validation\\n[278/44714] 1 - Mushi, Eyeball and a Teddy Bear.epub\\n  - Skipping validation\\n[279/44714] 100 Ways Not to Fail in Another World 001 (2023) (Digital) (AntsyLich).cbz\\n[280/44714] 100 Ways Not to Fail in Another World 002 (2023) (Digital) (AntsyLich).cbz\\n[281/44714] 100 Ways Not to Fail in Another World 003 (2023) (Digital) (AntsyLich).cbz\\n[282/44714] 100 Ways Not to Fail in Another World 004 (2023) (Digital) (AntsyLich).cbz\\n[283/44714] 100 Ways Not to Fail in Another World 005 (2023) (Digital) (AntsyLich).cbz\\n[284/44714] 100 Ways Not to Fail in Another World 006 (2023) (Digital) (AntsyLich).cbz\\n[285/44714] 100 Ways Not to Fail in Another World 007 (2023) (Digital) (AntsyLich).cbz\\n[286/44714] 100 Ways Not to Fail in Another World 008 (2023) (Digital) (AntsyLich).cbz\\n[287/44714] 100 Ways Not to Fail in Another World 009 (2023) (Digital) (AntsyLich).cbz\\n[288/44714] 100 Ways Not to Fail in Another World 010 (2023) (Digital) (AntsyLich).cbz\\n[289/44714] 100 Ways Not to Fail in Another World 011 (2023) (Digital) (AntsyLich).cbz\\n[290/44714] 12 Years Apart 001 (2021) (Digital) (1r0n).cbz\\n[291/44714] 12 Years Apart 002 (2021) (Digital) (1r0n).cbz\\n[292/44714] 12 Years Apart 003 (2021) (Digital) (1r0n).cbz\\n[293/44714] 12 Years Apart 004 (2021) (Digital) (1r0n).cbz\\n[294/44714] 12 Years Apart 005 (2021) (Digital) (1r0n).cbz\\n[295/44714] 12 Years Apart 006 (2021) (Digital) (1r0n).cbz\\n[296/44714] 12 Years Apart 007 (2021) (Digital) (1r0n).cbz\\n[29'; diagnostics_truncated=3219225",
+      "status": "pass"
+    },
+    "mismatch_counts": {},
+    "mismatches": [],
+    "processed_rows": 44714,
+    "rows": 44714,
+    "skipped_files": [
+      {
+        "matched": true,
+        "name": "03b. Yu-Gi-Oh! Transcend Game (2016) (Digital).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "1 - Mushi, Eyeball and a Teddy Bear.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "2 - Mushi, Eyeball and Sterilization Disinfection.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "3 - Mushi, Eyeball and a Chocolate Parfait.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "3-Gatsu no Lion Review Guidebook - Beginner.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "3-Gatsu no Lion Review Guidebook - Intermediate.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "4 - Mushi, Eyeball and Lovesong.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "4 Cut Hero Episode 157.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "5 - Mushi, Eyeball and Snow White.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "6 - Mushi, Eyeball and Damaged Hair.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "A Certain Magical Index - Volume SS1.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "A Certain Magical Index - Volume SS2.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "A Certain Magical Index New Testament 18 Bonus Short Story.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "A Certain Magical Index New Testament 20 Bonus Short Story.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "A Certain Magical Index SS v01 [Yen Press] [LuCaZ].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "A Certain Magical Index SS v02 [Yen Press] [LuCaZ].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "A Certain March 201st Volume.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "A Certain Scientific Railgun SS1.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "A Certain Scientific Railgun SS2.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "A Certain Scientific Railgun SS3.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ayakashi Triangle-Ch 89 - Shiv and The Shivers.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ayakashi Triangle-Ch 91 Kanade.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ayakashi Triangle-Ch 92 Reason to Help.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ayakashi Triangle-Ch 93 Those in Love with an Ayakashi Medium.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ayakashi Triangle-Ch 94 Ritta's Nightmare!.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ayakashi Triangle-Ch 95 The Monster Within.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Barakamon v18+1 (2020) (Digital) (XRA-Empire).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "BLEACH OFFICIAL CHARACTER BOOK 3 UNMASKED.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Boku wa Mari no Naka - c072-080 (v09) [CR].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Bouken Ou Beet v14c053-054.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Bouken Ou Beet v14c055-057 [RAW].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Campfire Cooking in Another World with My Absurd Skill Volume-1 Premium Ver.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Campfire Cooking in Another World with My Absurd Skill Volume-2.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Campfire Cooking in Another World with My Absurd Skill Volume-3.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Campfire Cooking in Another World with My Absurd Skill Volume-4.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Campfire Cooking in Another World with My Absurd Skill Volume-5.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Campfire Cooking in Another World with My Absurd Skill Volume-6.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0216 Shows Her Color (en).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0217 - Have Never Seen Anything Like It (en).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0218 - Queen it Over (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0219 - A Sense of Foreboding  (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0220 - Bull's-eye (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0221 - Ups and Downs of His Fate  (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0222 - Give Back (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0223 - Good Old Days (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0224 - Cutthroat (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0225 - Free-for-all (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0226 - Dynamic Duo (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0227 - Gangster (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0228 - Beat Hell Out of (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0229 - Go Easy on (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0230 - Get Stuck-up (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0231 - Blood-Chilling (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0232 - It Takes Two to Tango  (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0233 - Better Late Than Never (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0234 - There is no Mending (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0235 - Just Be Yourself  (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0236 - Band of Brothers  (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0237 - Make Allies  (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0238 - Really Into It (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0239 - Steel The Show (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0240 - Go Into Retirement  (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0241 - A Forced Smile (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0242 - Inherit The Crown (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0243 - Wide Array Of (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0244 - The Showdown Battle (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0245 - Grow Up To (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0246 - Giant Killing  (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.0247 - Hey Dude (en) [First Division Scanlations].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.38 - Kouhai-chan, Part 12.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.39 - Ai-chan, Part 14.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.40 - Maegami-chan, Part 14.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.41 - Kouhai-chan, Part 13.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.42 - Imouto-chan, Part 1.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.43 - Maegami-chan, Part 15.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.44 - Ai-chan, Part 15.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.45 - Kouhai-chan, Part 14.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.46 - Maegami-chan, Part 16.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.47 - Ai-chan, Part 16.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.48 - Jitome-chan, Part 1.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.49 - Imouto-chan, Part 2.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.50 - Jitome-chan, Part 2.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ch.51 - Kouhai-chan, Part 15.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Daughter of Evil - 1 - Clôture of Yellow.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Daughter of Evil - 2 - Wiegenlied of Green.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Daughter of Evil - 3 - Praeludium of Red.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Daughter of Evil - 4 - Praefacio of Blue.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Death Note - Bonus Chapter (Ch109, One-Shot) (VizMedia - All in One Edition, Scan, PNG).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Devils' Line - Extra 1.5 (2019) (Digital) (danke-Empire).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Don't XXX With Teachers! 030.2 (2022) (Digital) (Gremory)",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Final Chapter - To All of You in 2016.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ghosts of Greywoods - Act 001, Epilogue (Digital) (i -like.yuri).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grand Blue Dreaming - Extra (2020) (Digital) (danke-Empire).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grand Blue Dreaming 61 Extra (2021) (Digital) (Edge).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grand Blue Dreaming 62 Extra (2021) (Digital) (Edge).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grand Blue Dreaming 65 Extra (2021) (Digital) (Edge).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grand Blue Dreaming 74 Extra + Artwork (2022) (Digital).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grand Blue Dreaming 75 + Artwork (2022) (Digital).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grand Blue Dreaming 75 Extra + Artwork (2022) (Digital).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grimgar of Fantasy and Ash - Volume 14+ [J-Novel Club][Premium].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grimgar of Fantasy and Ash - Volume 14++ [J-Novel Club][Premium].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grimgar of Fantasy and Ash LN 14+ Premium [C2].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grimgar of Fantasy and Ash LN 14+ Premium [C].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grimgar of Fantasy and Ash LN 14++ Premium [C2].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grimgar of Fantasy and Ash LN 14++ Premium [C].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grimgar of Fantasy and Ash v14+ [Premium].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Grimgar of Fantasy and Ash v14++ [Premium].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Gundam Acguy - 2250 Miles Across North America.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Haganai, I Don't Have Many Friends {Special One-Shot 1} - Now With 50% More Fail! (2014) (Digital) (KG Manga).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Haganai, I Don't Have Many Friends {Special One-Shot 2} - Club Minutes (2014) (Digital) (KG Manga).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Hey! You’ve Kidnapped the Wrong Royal! [Cross Infinite World] [1r0n].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "I Reincarnated As Evil Alice, So the Only Thing I’m Courting Is Death! - 01 [C2].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "I Reincarnated As Evil Alice, So the Only Thing I’m Courting Is Death! - 01 [C].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "I Reincarnated As Evil Alice, So the Only Thing I’m Courting Is Death! - 01.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "I Was a Bottom-Tier Bureaucrat for 1,500 Years, and the Demon King Made Me a Minister [Yen Press] [LuCaZ].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "I Was a Bottom-Tier Bureaucrat for 1,500 Years, and the Demon King Made Me a Minister.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Ichigo 100% East Side Story.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Inside Mari (v02) (2019) (Digital) (t3dio).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Inside Mari (v03) (2019) (Digital) (t3dio).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Inside Mari (v04) (2019) (Digital) (t3dio).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Inside Mari (v05) (2019) (Digital) (t3dio).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Inside Mari (v06) (2020) (Digital) (t3dio).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Inside Mari (v07) (2021) (Digital) (t3dio).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Inside Mari (v08) (2021) (Digital) (t3dio).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "KA Esuma Bunko Relay Booklet 2020.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Kamijou-san, Two Idiots, Jinnai Shinobu, Gray Pig, and Freedom Award 903, Listen Up! …Fall Asleep and You Die, But Not From the Cold.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Kingdom Hearts - Chain of Memories - Complete (Volume 01-02) [Yen Press][Kindle-Kobo].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Kingdom Hearts 358-2 Days - Complete (Volume 01-03) [Yen Press][Kindle-Kobo].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "KinSP-Curry Cook -The Holy Man Of Love And Fury- Part 1.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "KinSP-Curry Cook -The Holy Man Of Love And Fury- Part 2.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Made in Abyss Official Anthology - Layer 01 - Irredeemable Cave Raiders (2020) (Digital) (danke-Empire).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 087 - Victory Prospects and Business Avenues (2023) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 088 - Kamakura-san's House Party (2023) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 089 - A Grand Assembly (2023) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 090 - RABBIT (2023) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 091 - Infiltration (2023) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 092 - Responsibility and Results (2023) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 093 - Restart (2023) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 094 - A Promise (2023) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 095 - Vow (2023) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 096 - Welcome to Magilumiere (2023) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 097 - Kaii Control Chip (2023) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 098 - MP-Charge-Kun (2024) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 099 - Gratitude (2024) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 100 - A Fun Job (2024) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 101 - Ruin and Revival (2024) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 101.1 - Bonus Chapter 4 (2024) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 102 - Reopen (2024) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 103 - Magikyu!! (2024) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Magilumiere Co. Ltd. 104 - 'Tis Time for 'Torture,' Kurairi-sama (2024) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Mobile Suit Gundam Silhouette Formula 91 (Complete).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "MOBILE SUIT GUNDAM THE ORIGIN  Section 100.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "MOBILE SUIT GUNDAM THE ORIGIN  Section 98.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "MOBILE SUIT GUNDAM THE ORIGIN  Section 99.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Musume Janakute, Mama ga Sukinano SS1 + extra illustrations.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Musume Janakute, Mama ga Sukinano SS2 + extra illustrations.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "My Stepmom's Daughter Is My Ex v01.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "One Piece - Romance Dawn ver. 1.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "One Piece - Strong World (Chapter 0 [aka Chapter 565.5]).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "One Piece 1054 v01 [official] [upscaled].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 1-A.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 1-B.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 2-A.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 2-B.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 3-A.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 3-B.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 3-C.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 4-A.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 4-B.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 5-A.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 5-B.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 6-A.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 6-B.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Owari no Chronicle 7.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Rakudai Kishi no Eiyuutan - 01.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Rakudai Kishi no Eiyuutan - 02.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Rakudai Kishi no Eiyuutan - 03.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Rakudai Kishi no Eiyuutan - 04.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Rakudai Kishi no Eiyuutan - 05.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Rakudai Kishi no Eiyuutan - 06.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Rakudai Kishi no Eiyuutan - 07.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Rakudai Kishi no Eiyuutan - 08.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Rakudai Kishi no Eiyuutan - 09.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Rakudai Kishi no Eiyuutan - 10.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Rakudai Kishi no Eiyuutan - 11.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Reflection of Another World Volume v01 [Cross Infinite World] [Stick].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Return of the 8th Class Magician - Season 1 - Swaggy Repacks.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Saki Biyori BG Chapter 45-46.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Saki Biyori BG Chapter 47-48.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Saki Biyori BG Chapter 50-51.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Saki Biyori BG Chapter 52-53 v2.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Saki Biyori BG Chapter 54-55.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Saki Biyori BG Chapter 56-57_v2.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Saki Biyori BG Chapter 58-59.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Saki Biyori BG Chapter 62_v2.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Saki v08 extra.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Saki volume 8 extra.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Sensei de ○○ Shicha Ikemasen! (Don't XXX With Teachers!) Chapter 26.3.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Sensei de ○○ Shicha Ikemasen! (Don't XXX With Teachers!) Chapter 30.1- 32.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Sensei de ○○ Shicha Ikemasen! (Don't XXX With Teachers!) Chapter 33.3- 34.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shojo Fight 18 - Yoko Nihonbashi.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v02) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v03) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v04) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v05) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v06) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v07) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v08) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v09) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v10) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v11) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v12) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v13) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v14) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v15) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v16) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v17) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v18) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v19) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v20) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v21) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v22) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v23) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v24) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v25) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v26) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Shoku King (v27) [Digital] [Tikas].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Skeleton Double 031 - CH. 31 SHOKO YOROIBATA (2023) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Skeleton Double 032 - CH. 32 SPRING AND STRIFE (2024) (Digital) (Rillant).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Spy x Family 065 v01 [official] [upscaled].cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "SSS-Class Suicide Hunter 04 v01 [epub].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Starting Point - 1979-1996 [VIZ Media] [LuCaZ].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Sweetness and Lightning Extra 1 (2018) (Digital) (danke-Empire).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "The Irregular at Magic High School v13v2 v01 [Yen Press] [-KS-].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "The Irregular at Magic High School v13v2 [Yen Press] [-KS-] [C2].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "The Irregular at Magic High School v13v2 [Yen Press] [-KS-].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "The Irregular at Magic High School x Sword Art Online Crossover - Part 1 - Dream Game [C2].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "The Irregular at Magic High School x Sword Art Online Crossover - Part 1 - Dream Game.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "The Irregular at Magic High School x Sword Art Online Crossover - Part 2 - Versus II [C2].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "The Irregular at Magic High School x Sword Art Online Crossover - Part 2 - Versus II.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "The Ryuo_s Work is Never Done!, Vol. 15.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "The Ryuo_s Work is Never Done!, Vol. 3.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "The Ryuo_s Work is Never Done!, Vol. 4.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "the-engagement-of-marielle-clarac v01 [Premium].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "the-engagement-of-marielle-clarac v01.epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Turning Point - 1997-2008 [VIZ Media] [LuCaZ].epub",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "Where to Go in a Whole Other World 024 - 4- A Little Shrine in a Whole Other World (2021) (Digital) (AntsyLich).cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "ご注文はうさぎですか？ 第5巻 v01.cbz",
+        "status": "not_asserted"
+      },
+      {
+        "matched": true,
+        "name": "ご注文はうさぎですか？ 第5巻.cbz",
+        "status": "not_asserted"
+      }
+    ],
+    "skipped_row_details": [
+      {
+        "name": "03b. Yu-Gi-Oh! Transcend Game (2016) (Digital).cbz",
+        "row": 277,
+        "status": "not_asserted"
+      },
+      {
+        "name": "1 - Mushi, Eyeball and a Teddy Bear.epub",
+        "row": 278,
+        "status": "not_asserted"
+      },
+      {
+        "name": "2 - Mushi, Eyeball and Sterilization Disinfection.epub",
+        "row": 367,
+        "status": "not_asserted"
+      },
+      {
+        "name": "3 - Mushi, Eyeball and a Chocolate Parfait.epub",
+        "row": 439,
+        "status": "not_asserted"
+      },
+      {
+        "name": "3-Gatsu no Lion Review Guidebook - Beginner.cbz",
+        "row": 440,
+        "status": "not_asserted"
+      },
+      {
+        "name": "3-Gatsu no Lion Review Guidebook - Intermediate.cbz",
+        "row": 441,
+        "status": "not_asserted"
+      },
+      {
+        "name": "4 - Mushi, Eyeball and Lovesong.epub",
+        "row": 447,
+        "status": "not_asserted"
+      },
+      {
+        "name": "4 Cut Hero Episode 157.cbz",
+        "row": 641,
+        "status": "not_asserted"
+      },
+      {
+        "name": "5 - Mushi, Eyeball and Snow White.epub",
+        "row": 642,
+        "status": "not_asserted"
+      },
+      {
+        "name": "6 - Mushi, Eyeball and Damaged Hair.epub",
+        "row": 652,
+        "status": "not_asserted"
+      },
+      {
+        "name": "A Certain Magical Index - Volume SS1.epub",
+        "row": 810,
+        "status": "not_asserted"
+      },
+      {
+        "name": "A Certain Magical Index - Volume SS2.epub",
+        "row": 811,
+        "status": "not_asserted"
+      },
+      {
+        "name": "A Certain Magical Index New Testament 18 Bonus Short Story.epub",
+        "row": 851,
+        "status": "not_asserted"
+      },
+      {
+        "name": "A Certain Magical Index New Testament 20 Bonus Short Story.epub",
+        "row": 852,
+        "status": "not_asserted"
+      },
+      {
+        "name": "A Certain Magical Index SS v01 [Yen Press] [LuCaZ].epub",
+        "row": 876,
+        "status": "not_asserted"
+      },
+      {
+        "name": "A Certain Magical Index SS v02 [Yen Press] [LuCaZ].epub",
+        "row": 877,
+        "status": "not_asserted"
+      },
+      {
+        "name": "A Certain March 201st Volume.epub",
+        "row": 925,
+        "status": "not_asserted"
+      },
+      {
+        "name": "A Certain Scientific Railgun SS1.epub",
+        "row": 948,
+        "status": "not_asserted"
+      },
+      {
+        "name": "A Certain Scientific Railgun SS2.epub",
+        "row": 949,
+        "status": "not_asserted"
+      },
+      {
+        "name": "A Certain Scientific Railgun SS3.epub",
+        "row": 950,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ayakashi Triangle-Ch 89 - Shiv and The Shivers.cbz",
+        "row": 4419,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ayakashi Triangle-Ch 91 Kanade.cbz",
+        "row": 4420,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ayakashi Triangle-Ch 92 Reason to Help.cbz",
+        "row": 4421,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ayakashi Triangle-Ch 93 Those in Love with an Ayakashi Medium.cbz",
+        "row": 4422,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ayakashi Triangle-Ch 94 Ritta's Nightmare!.cbz",
+        "row": 4423,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ayakashi Triangle-Ch 95 The Monster Within.cbz",
+        "row": 4424,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Barakamon v18+1 (2020) (Digital) (XRA-Empire).cbz",
+        "row": 4680,
+        "status": "not_asserted"
+      },
+      {
+        "name": "BLEACH OFFICIAL CHARACTER BOOK 3 UNMASKED.cbz",
+        "row": 5360,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Boku wa Mari no Naka - c072-080 (v09) [CR].cbz",
+        "row": 5889,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Bouken Ou Beet v14c053-054.cbz",
+        "row": 6033,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Bouken Ou Beet v14c055-057 [RAW].cbz",
+        "row": 6034,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Campfire Cooking in Another World with My Absurd Skill Volume-1 Premium Ver.epub",
+        "row": 6573,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Campfire Cooking in Another World with My Absurd Skill Volume-2.epub",
+        "row": 6574,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Campfire Cooking in Another World with My Absurd Skill Volume-3.epub",
+        "row": 6575,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Campfire Cooking in Another World with My Absurd Skill Volume-4.epub",
+        "row": 6576,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Campfire Cooking in Another World with My Absurd Skill Volume-5.epub",
+        "row": 6577,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Campfire Cooking in Another World with My Absurd Skill Volume-6.epub",
+        "row": 6578,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0216 Shows Her Color (en).cbz",
+        "row": 7003,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0217 - Have Never Seen Anything Like It (en).cbz",
+        "row": 7004,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0218 - Queen it Over (en) [First Division Scanlations].cbz",
+        "row": 7005,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0219 - A Sense of Foreboding  (en) [First Division Scanlations].cbz",
+        "row": 7006,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0220 - Bull's-eye (en) [First Division Scanlations].cbz",
+        "row": 7007,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0221 - Ups and Downs of His Fate  (en) [First Division Scanlations].cbz",
+        "row": 7008,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0222 - Give Back (en) [First Division Scanlations].cbz",
+        "row": 7009,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0223 - Good Old Days (en) [First Division Scanlations].cbz",
+        "row": 7010,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0224 - Cutthroat (en) [First Division Scanlations].cbz",
+        "row": 7011,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0225 - Free-for-all (en) [First Division Scanlations].cbz",
+        "row": 7012,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0226 - Dynamic Duo (en) [First Division Scanlations].cbz",
+        "row": 7013,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0227 - Gangster (en) [First Division Scanlations].cbz",
+        "row": 7014,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0228 - Beat Hell Out of (en) [First Division Scanlations].cbz",
+        "row": 7015,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0229 - Go Easy on (en) [First Division Scanlations].cbz",
+        "row": 7016,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0230 - Get Stuck-up (en) [First Division Scanlations].cbz",
+        "row": 7017,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0231 - Blood-Chilling (en) [First Division Scanlations].cbz",
+        "row": 7018,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0232 - It Takes Two to Tango  (en) [First Division Scanlations].cbz",
+        "row": 7019,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0233 - Better Late Than Never (en) [First Division Scanlations].cbz",
+        "row": 7020,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0234 - There is no Mending (en) [First Division Scanlations].cbz",
+        "row": 7021,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0235 - Just Be Yourself  (en) [First Division Scanlations].cbz",
+        "row": 7022,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0236 - Band of Brothers  (en) [First Division Scanlations].cbz",
+        "row": 7023,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0237 - Make Allies  (en) [First Division Scanlations].cbz",
+        "row": 7024,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0238 - Really Into It (en) [First Division Scanlations].cbz",
+        "row": 7025,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0239 - Steel The Show (en) [First Division Scanlations].cbz",
+        "row": 7026,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0240 - Go Into Retirement  (en) [First Division Scanlations].cbz",
+        "row": 7027,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0241 - A Forced Smile (en) [First Division Scanlations].cbz",
+        "row": 7028,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0242 - Inherit The Crown (en) [First Division Scanlations].cbz",
+        "row": 7029,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0243 - Wide Array Of (en) [First Division Scanlations].cbz",
+        "row": 7030,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0244 - The Showdown Battle (en) [First Division Scanlations].cbz",
+        "row": 7031,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0245 - Grow Up To (en) [First Division Scanlations].cbz",
+        "row": 7032,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0246 - Giant Killing  (en) [First Division Scanlations].cbz",
+        "row": 7033,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.0247 - Hey Dude (en) [First Division Scanlations].cbz",
+        "row": 7034,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.38 - Kouhai-chan, Part 12.cbz",
+        "row": 7035,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.39 - Ai-chan, Part 14.cbz",
+        "row": 7036,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.40 - Maegami-chan, Part 14.cbz",
+        "row": 7037,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.41 - Kouhai-chan, Part 13.cbz",
+        "row": 7038,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.42 - Imouto-chan, Part 1.cbz",
+        "row": 7039,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.43 - Maegami-chan, Part 15.cbz",
+        "row": 7040,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.44 - Ai-chan, Part 15.cbz",
+        "row": 7041,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.45 - Kouhai-chan, Part 14.cbz",
+        "row": 7042,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.46 - Maegami-chan, Part 16.cbz",
+        "row": 7043,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.47 - Ai-chan, Part 16.cbz",
+        "row": 7044,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.48 - Jitome-chan, Part 1.cbz",
+        "row": 7045,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.49 - Imouto-chan, Part 2.cbz",
+        "row": 7046,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.50 - Jitome-chan, Part 2.cbz",
+        "row": 7047,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ch.51 - Kouhai-chan, Part 15.cbz",
+        "row": 7048,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Daughter of Evil - 1 - Clôture of Yellow.epub",
+        "row": 8646,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Daughter of Evil - 2 - Wiegenlied of Green.epub",
+        "row": 8647,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Daughter of Evil - 3 - Praeludium of Red.epub",
+        "row": 8648,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Daughter of Evil - 4 - Praefacio of Blue.epub",
+        "row": 8649,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Death Note - Bonus Chapter (Ch109, One-Shot) (VizMedia - All in One Edition, Scan, PNG).cbz",
+        "row": 8878,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Devils' Line - Extra 1.5 (2019) (Digital) (danke-Empire).cbz",
+        "row": 9142,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Don't XXX With Teachers! 030.2 (2022) (Digital) (Gremory)",
+        "row": 9676,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Final Chapter - To All of You in 2016.cbz",
+        "row": 11946,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ghosts of Greywoods - Act 001, Epilogue (Digital) (i -like.yuri).cbz",
+        "row": 13122,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grand Blue Dreaming - Extra (2020) (Digital) (danke-Empire).cbz",
+        "row": 13827,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grand Blue Dreaming 61 Extra (2021) (Digital) (Edge).cbz",
+        "row": 13861,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grand Blue Dreaming 62 Extra (2021) (Digital) (Edge).cbz",
+        "row": 13863,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grand Blue Dreaming 65 Extra (2021) (Digital) (Edge).cbz",
+        "row": 13867,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grand Blue Dreaming 74 Extra + Artwork (2022) (Digital).cbz",
+        "row": 13877,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grand Blue Dreaming 75 + Artwork (2022) (Digital).cbz",
+        "row": 13878,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grand Blue Dreaming 75 Extra + Artwork (2022) (Digital).cbz",
+        "row": 13879,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grimgar of Fantasy and Ash - Volume 14+ [J-Novel Club][Premium].epub",
+        "row": 14015,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grimgar of Fantasy and Ash - Volume 14++ [J-Novel Club][Premium].epub",
+        "row": 14016,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grimgar of Fantasy and Ash LN 14+ Premium [C].epub",
+        "row": 14017,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grimgar of Fantasy and Ash LN 14+ Premium [C2].epub",
+        "row": 14018,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grimgar of Fantasy and Ash LN 14++ Premium [C].epub",
+        "row": 14019,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grimgar of Fantasy and Ash LN 14++ Premium [C2].epub",
+        "row": 14020,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grimgar of Fantasy and Ash v14+ [Premium].epub",
+        "row": 14070,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Grimgar of Fantasy and Ash v14++ [Premium].epub",
+        "row": 14071,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Gundam Acguy - 2250 Miles Across North America.cbz",
+        "row": 14197,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Haganai, I Don't Have Many Friends {Special One-Shot 1} - Now With 50% More Fail! (2014) (Digital) (KG Manga).cbz",
+        "row": 14221,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Haganai, I Don't Have Many Friends {Special One-Shot 2} - Club Minutes (2014) (Digital) (KG Manga).cbz",
+        "row": 14222,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Hey! You’ve Kidnapped the Wrong Royal! [Cross Infinite World] [1r0n].epub",
+        "row": 15560,
+        "status": "not_asserted"
+      },
+      {
+        "name": "I Reincarnated As Evil Alice, So the Only Thing I’m Courting Is Death! - 01 [C].epub",
+        "row": 16778,
+        "status": "not_asserted"
+      },
+      {
+        "name": "I Reincarnated As Evil Alice, So the Only Thing I’m Courting Is Death! - 01 [C2].epub",
+        "row": 16779,
+        "status": "not_asserted"
+      },
+      {
+        "name": "I Reincarnated As Evil Alice, So the Only Thing I’m Courting Is Death! - 01.epub",
+        "row": 16780,
+        "status": "not_asserted"
+      },
+      {
+        "name": "I Was a Bottom-Tier Bureaucrat for 1,500 Years, and the Demon King Made Me a Minister [Yen Press] [LuCaZ].epub",
+        "row": 16858,
+        "status": "not_asserted"
+      },
+      {
+        "name": "I Was a Bottom-Tier Bureaucrat for 1,500 Years, and the Demon King Made Me a Minister.cbz",
+        "row": 16863,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Ichigo 100% East Side Story.cbz",
+        "row": 17243,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Inside Mari (v02) (2019) (Digital) (t3dio).cbz",
+        "row": 17526,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Inside Mari (v03) (2019) (Digital) (t3dio).cbz",
+        "row": 17527,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Inside Mari (v04) (2019) (Digital) (t3dio).cbz",
+        "row": 17528,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Inside Mari (v05) (2019) (Digital) (t3dio).cbz",
+        "row": 17529,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Inside Mari (v06) (2020) (Digital) (t3dio).cbz",
+        "row": 17530,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Inside Mari (v07) (2021) (Digital) (t3dio).cbz",
+        "row": 17531,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Inside Mari (v08) (2021) (Digital) (t3dio).cbz",
+        "row": 17532,
+        "status": "not_asserted"
+      },
+      {
+        "name": "KA Esuma Bunko Relay Booklet 2020.epub",
+        "row": 18293,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Kamijou-san, Two Idiots, Jinnai Shinobu, Gray Pig, and Freedom Award 903, Listen Up! …Fall Asleep and You Die, But Not From the Cold.epub",
+        "row": 18456,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Kingdom Hearts - Chain of Memories - Complete (Volume 01-02) [Yen Press][Kindle-Kobo].epub",
+        "row": 19022,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Kingdom Hearts 358-2 Days - Complete (Volume 01-03) [Yen Press][Kindle-Kobo].epub",
+        "row": 19025,
+        "status": "not_asserted"
+      },
+      {
+        "name": "KinSP-Curry Cook -The Holy Man Of Love And Fury- Part 1.cbz",
+        "row": 19048,
+        "status": "not_asserted"
+      },
+      {
+        "name": "KinSP-Curry Cook -The Holy Man Of Love And Fury- Part 2.cbz",
+        "row": 19049,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Made in Abyss Official Anthology - Layer 01 - Irredeemable Cave Raiders (2020) (Digital) (danke-Empire).cbz",
+        "row": 21143,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 087 - Victory Prospects and Business Avenues (2023) (Digital) (Rillant).cbz",
+        "row": 21293,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 088 - Kamakura-san's House Party (2023) (Digital) (Rillant).cbz",
+        "row": 21294,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 089 - A Grand Assembly (2023) (Digital) (Rillant).cbz",
+        "row": 21295,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 090 - RABBIT (2023) (Digital) (Rillant).cbz",
+        "row": 21296,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 091 - Infiltration (2023) (Digital) (Rillant).cbz",
+        "row": 21297,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 092 - Responsibility and Results (2023) (Digital) (Rillant).cbz",
+        "row": 21298,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 093 - Restart (2023) (Digital) (Rillant).cbz",
+        "row": 21299,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 094 - A Promise (2023) (Digital) (Rillant).cbz",
+        "row": 21300,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 095 - Vow (2023) (Digital) (Rillant).cbz",
+        "row": 21301,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 096 - Welcome to Magilumiere (2023) (Digital) (Rillant).cbz",
+        "row": 21302,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 097 - Kaii Control Chip (2023) (Digital) (Rillant).cbz",
+        "row": 21303,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 098 - MP-Charge-Kun (2024) (Digital) (Rillant).cbz",
+        "row": 21304,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 099 - Gratitude (2024) (Digital) (Rillant).cbz",
+        "row": 21305,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 100 - A Fun Job (2024) (Digital) (Rillant).cbz",
+        "row": 21306,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 101 - Ruin and Revival (2024) (Digital) (Rillant).cbz",
+        "row": 21307,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 101.1 - Bonus Chapter 4 (2024) (Digital) (Rillant).cbz",
+        "row": 21308,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 102 - Reopen (2024) (Digital) (Rillant).cbz",
+        "row": 21309,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 103 - Magikyu!! (2024) (Digital) (Rillant).cbz",
+        "row": 21310,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Magilumiere Co. Ltd. 104 - 'Tis Time for 'Torture,' Kurairi-sama (2024) (Digital) (Rillant).cbz",
+        "row": 21311,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Mobile Suit Gundam Silhouette Formula 91 (Complete).cbz",
+        "row": 22694,
+        "status": "not_asserted"
+      },
+      {
+        "name": "MOBILE SUIT GUNDAM THE ORIGIN  Section 100.cbz",
+        "row": 22695,
+        "status": "not_asserted"
+      },
+      {
+        "name": "MOBILE SUIT GUNDAM THE ORIGIN  Section 98.cbz",
+        "row": 22696,
+        "status": "not_asserted"
+      },
+      {
+        "name": "MOBILE SUIT GUNDAM THE ORIGIN  Section 99.cbz",
+        "row": 22697,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Musume Janakute, Mama ga Sukinano SS1 + extra illustrations.epub",
+        "row": 23299,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Musume Janakute, Mama ga Sukinano SS2 + extra illustrations.epub",
+        "row": 23300,
+        "status": "not_asserted"
+      },
+      {
+        "name": "My Stepmom's Daughter Is My Ex v01.epub",
+        "row": 24929,
+        "status": "not_asserted"
+      },
+      {
+        "name": "One Piece - Romance Dawn ver. 1.cbz",
+        "row": 26120,
+        "status": "not_asserted"
+      },
+      {
+        "name": "One Piece - Strong World (Chapter 0 [aka Chapter 565.5]).cbz",
+        "row": 26121,
+        "status": "not_asserted"
+      },
+      {
+        "name": "One Piece 1054 v01 [official] [upscaled].cbz",
+        "row": 26191,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 1-A.epub",
+        "row": 27746,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 1-B.epub",
+        "row": 27747,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 2-A.epub",
+        "row": 27748,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 2-B.epub",
+        "row": 27749,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 3-A.epub",
+        "row": 27750,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 3-B.epub",
+        "row": 27751,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 3-C.epub",
+        "row": 27752,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 4-A.epub",
+        "row": 27753,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 4-B.epub",
+        "row": 27754,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 5-A.epub",
+        "row": 27755,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 5-B.epub",
+        "row": 27756,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 6-A.epub",
+        "row": 27757,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 6-B.epub",
+        "row": 27758,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Owari no Chronicle 7.epub",
+        "row": 27759,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Rakudai Kishi no Eiyuutan - 01.epub",
+        "row": 28679,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Rakudai Kishi no Eiyuutan - 02.epub",
+        "row": 28680,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Rakudai Kishi no Eiyuutan - 03.epub",
+        "row": 28681,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Rakudai Kishi no Eiyuutan - 04.epub",
+        "row": 28682,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Rakudai Kishi no Eiyuutan - 05.epub",
+        "row": 28683,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Rakudai Kishi no Eiyuutan - 06.epub",
+        "row": 28684,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Rakudai Kishi no Eiyuutan - 07.epub",
+        "row": 28685,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Rakudai Kishi no Eiyuutan - 08.epub",
+        "row": 28686,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Rakudai Kishi no Eiyuutan - 09.epub",
+        "row": 28687,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Rakudai Kishi no Eiyuutan - 10.epub",
+        "row": 28688,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Rakudai Kishi no Eiyuutan - 11.epub",
+        "row": 28689,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Reflection of Another World Volume v01 [Cross Infinite World] [Stick].epub",
+        "row": 29406,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Return of the 8th Class Magician - Season 1 - Swaggy Repacks.cbz",
+        "row": 29747,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Saki Biyori BG Chapter 45-46.cbz",
+        "row": 30478,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Saki Biyori BG Chapter 47-48.cbz",
+        "row": 30479,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Saki Biyori BG Chapter 50-51.cbz",
+        "row": 30481,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Saki Biyori BG Chapter 52-53 v2.cbz",
+        "row": 30482,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Saki Biyori BG Chapter 54-55.cbz",
+        "row": 30483,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Saki Biyori BG Chapter 56-57_v2.cbz",
+        "row": 30484,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Saki Biyori BG Chapter 58-59.cbz",
+        "row": 30485,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Saki Biyori BG Chapter 62_v2.cbz",
+        "row": 30488,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Saki v08 extra.cbz",
+        "row": 30698,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Saki volume 8 extra.cbz",
+        "row": 30720,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Sensei de ○○ Shicha Ikemasen! (Don't XXX With Teachers!) Chapter 26.3.cbz",
+        "row": 31210,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Sensei de ○○ Shicha Ikemasen! (Don't XXX With Teachers!) Chapter 30.1- 32.cbz",
+        "row": 31211,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Sensei de ○○ Shicha Ikemasen! (Don't XXX With Teachers!) Chapter 33.3- 34.cbz",
+        "row": 31212,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shojo Fight 18 - Yoko Nihonbashi.cbz",
+        "row": 32156,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v02) [Digital] [Tikas].cbz",
+        "row": 32161,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v03) [Digital] [Tikas].cbz",
+        "row": 32162,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v04) [Digital] [Tikas].cbz",
+        "row": 32163,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v05) [Digital] [Tikas].cbz",
+        "row": 32164,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v06) [Digital] [Tikas].cbz",
+        "row": 32165,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v07) [Digital] [Tikas].cbz",
+        "row": 32166,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v08) [Digital] [Tikas].cbz",
+        "row": 32167,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v09) [Digital] [Tikas].cbz",
+        "row": 32168,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v10) [Digital] [Tikas].cbz",
+        "row": 32169,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v11) [Digital] [Tikas].cbz",
+        "row": 32170,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v12) [Digital] [Tikas].cbz",
+        "row": 32171,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v13) [Digital] [Tikas].cbz",
+        "row": 32172,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v14) [Digital] [Tikas].cbz",
+        "row": 32173,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v15) [Digital] [Tikas].cbz",
+        "row": 32174,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v16) [Digital] [Tikas].cbz",
+        "row": 32175,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v17) [Digital] [Tikas].cbz",
+        "row": 32176,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v18) [Digital] [Tikas].cbz",
+        "row": 32177,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v19) [Digital] [Tikas].cbz",
+        "row": 32178,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v20) [Digital] [Tikas].cbz",
+        "row": 32179,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v21) [Digital] [Tikas].cbz",
+        "row": 32180,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v22) [Digital] [Tikas].cbz",
+        "row": 32181,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v23) [Digital] [Tikas].cbz",
+        "row": 32182,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v24) [Digital] [Tikas].cbz",
+        "row": 32183,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v25) [Digital] [Tikas].cbz",
+        "row": 32184,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v26) [Digital] [Tikas].cbz",
+        "row": 32185,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Shoku King (v27) [Digital] [Tikas].cbz",
+        "row": 32186,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Skeleton Double 031 - CH. 31 SHOKO YOROIBATA (2023) (Digital) (Rillant).cbz",
+        "row": 32209,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Skeleton Double 032 - CH. 32 SPRING AND STRIFE (2024) (Digital) (Rillant).cbz",
+        "row": 32210,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Spy x Family 065 v01 [official] [upscaled].cbz",
+        "row": 33993,
+        "status": "not_asserted"
+      },
+      {
+        "name": "SSS-Class Suicide Hunter 04 v01 [epub].epub",
+        "row": 34109,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Starting Point - 1979-1996 [VIZ Media] [LuCaZ].epub",
+        "row": 34138,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Sweetness and Lightning Extra 1 (2018) (Digital) (danke-Empire).cbz",
+        "row": 34560,
+        "status": "not_asserted"
+      },
+      {
+        "name": "The Irregular at Magic High School v13v2 [Yen Press] [-KS-] [C2].epub",
+        "row": 37786,
+        "status": "not_asserted"
+      },
+      {
+        "name": "The Irregular at Magic High School v13v2 [Yen Press] [-KS-].epub",
+        "row": 37787,
+        "status": "not_asserted"
+      },
+      {
+        "name": "The Irregular at Magic High School v13v2 v01 [Yen Press] [-KS-].epub",
+        "row": 37788,
+        "status": "not_asserted"
+      },
+      {
+        "name": "The Irregular at Magic High School x Sword Art Online Crossover - Part 1 - Dream Game [C2].epub",
+        "row": 37800,
+        "status": "not_asserted"
+      },
+      {
+        "name": "The Irregular at Magic High School x Sword Art Online Crossover - Part 1 - Dream Game.epub",
+        "row": 37801,
+        "status": "not_asserted"
+      },
+      {
+        "name": "The Irregular at Magic High School x Sword Art Online Crossover - Part 2 - Versus II [C2].epub",
+        "row": 37802,
+        "status": "not_asserted"
+      },
+      {
+        "name": "The Irregular at Magic High School x Sword Art Online Crossover - Part 2 - Versus II.epub",
+        "row": 37803,
+        "status": "not_asserted"
+      },
+      {
+        "name": "The Ryuo_s Work is Never Done!, Vol. 15.epub",
+        "row": 38821,
+        "status": "not_asserted"
+      },
+      {
+        "name": "The Ryuo_s Work is Never Done!, Vol. 3.epub",
+        "row": 38822,
+        "status": "not_asserted"
+      },
+      {
+        "name": "The Ryuo_s Work is Never Done!, Vol. 4.epub",
+        "row": 38823,
+        "status": "not_asserted"
+      },
+      {
+        "name": "the-engagement-of-marielle-clarac v01 [Premium].epub",
+        "row": 39949,
+        "status": "not_asserted"
+      },
+      {
+        "name": "the-engagement-of-marielle-clarac v01.epub",
+        "row": 39950,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Turning Point - 1997-2008 [VIZ Media] [LuCaZ].epub",
+        "row": 41863,
+        "status": "not_asserted"
+      },
+      {
+        "name": "Where to Go in a Whole Other World 024 - 4- A Little Shrine in a Whole Other World (2021) (Digital) (AntsyLich).cbz",
+        "row": 43311,
+        "status": "not_asserted"
+      },
+      {
+        "name": "ご注文はうさぎですか？ 第5巻 v01.cbz",
+        "row": 44713,
+        "status": "not_asserted"
+      },
+      {
+        "name": "ご注文はうさぎですか？ 第5巻.cbz",
+        "row": 44714,
+        "status": "not_asserted"
+      }
+    ],
+    "skipped_rows": 249,
+    "status": "pass",
+    "unused_metadata_fields": [
+      "Release Year",
+      "Release Part",
+      "Index Number",
+      "Release Group",
+      "Publisher",
+      "Subtitle",
+      "Extras"
+    ],
+    "validated_fields": [
+      "Release Number",
+      "Series Name",
+      "File Type"
+    ],
+    "validated_rows": 44465
+  },
+  "dependency_versions": {
+    "Unidecode": "1.4.0",
+    "beautifulsoup4": "4.14.2",
+    "discord-webhook": "1.4.1",
+    "filetype": "1.2.0",
+    "lxml": "6.0.2",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "4.14.0.94",
+    "pillow": "12.0.0",
+    "py7zr": "1.1.3",
+    "rarfile": "4.2",
+    "regex": "2025.9.18",
+    "requests": "2.32.5",
+    "scandir": "1.10.0",
+    "scikit-image": "0.26.0",
+    "titlecase": "2.4.1",
+    "watchdog": "6.0.0"
+  },
+  "mode": "all",
+  "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+  "python": "3.14.6",
+  "python_implementation": "CPython",
+  "schema_version": 1,
+  "source_hashes": {
+    "komga_cover_extractor.py": "00e507f11af2b6078f3c374ac0be95908ca44d89d5b93b77c5e299a84208c23e",
+    "manga_novel_dataset.csv": "a8c196f729286940dbbb6ff8efe4edfb3267187fbc71a1023973de65d8dcc7e7",
+    "settings.py": "b4d40983a89046fec3a48f2ac7694b402baaba4622fdbf513b88497c1a71c454",
+    "tests.py": "a4c1f06298a932e0e67a901a23d03c7c70aff8c1c779c2892419fe11dc1d8de1"
+  },
+  "tests": [
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_set_num_as_float_or_int",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_remove_hidden_files",
+      "status": "pass"
+    },
+    {
+      "detail": "AssertionError",
+      "name": "test_remove_ignored_folders",
+      "status": "fail"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_remove_hidden_folders",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_filter_non_chapters",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_contains_chapter_keywords",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_contains_volume_keywords",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_get_file_extension",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_get_extensionless_name",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_is_volume_one",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_get_series_name_from_chapter",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_get_folder_type",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_check_for_multi_volume_file",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_convert_list_of_numbers_to_array",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_get_release_number_cache",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_get_release_year",
+      "status": "pass"
+    },
+    {
+      "detail": "dormant original runner entry; AssertionError",
+      "name": "test_get_extra_from_group",
+      "status": "fail"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_get_file_part",
+      "status": "pass"
+    },
+    {
+      "detail": "dormant original runner entry; TypeError: get_keyword_scores() takes 1 positional argument but 3 were given",
+      "name": "test_get_keyword_score",
+      "status": "fail"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_remove_dual_space",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_normalize_str",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_clean_str",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_array_to_string",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_remove_duplicates",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_remove_brackets",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_replace_underscores",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_get_extras",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_isfloat",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_isint",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_parse_html_tags",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_check_for_exception_keywords",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_has_one_set_of_numbers",
+      "status": "pass"
+    },
+    {
+      "detail": "dormant original runner entry; AssertionError",
+      "name": "test_has_multiple_numbers",
+      "status": "fail"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_organize_by_first_letter",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_contains_unicode",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_contains_punctuation",
+      "status": "pass"
+    },
+    {
+      "detail": "completed without diagnostics",
+      "name": "test_contains_brackets",
+      "status": "pass"
+    },
+    {
+      "detail": "no assertions in original function; not invoked. The rename companion requires missing /dl/Manga & Novels and logs/test_file_list.txt fixtures; the sorting companion discards its sorted result.",
+      "name": "test_rename_files",
+      "status": "not_asserted"
+    },
+    {
+      "detail": "no assertions in original function; not invoked. The rename companion requires missing /dl/Manga & Novels and logs/test_file_list.txt fixtures; the sorting companion discards its sorted result.",
+      "name": "test_sorting_volumes_by_volume_number",
+      "status": "not_asserted"
+    },
+    {
+      "adapted": true,
+      "detail": "adapted fixture policy ignored_folder_names=['test']; completed without diagnostics",
+      "name": "adapted:test_remove_ignored_folders",
+      "status": "pass"
+    },
+    {
+      "adapted": true,
+      "detail": "adapted fixture call binding name, fixture-root and chapter_number for 108 original calls; completed without diagnostics",
+      "name": "adapted:test_get_series_name_from_chapter",
+      "status": "pass"
+    }
+  ]
+}

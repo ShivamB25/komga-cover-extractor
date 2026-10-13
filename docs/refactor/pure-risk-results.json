@@ -1,0 +1,15 @@
+{
+  "baseline_sha256": "00e507f11af2b6078f3c374ac0be95908ca44d89d5b93b77c5e299a84208c23e",
+  "python": "CPython3.14.4",
+  "platform": "Linux x86_64",
+  "scope": "reviewed original function AST bodies only, injected pure constants/dependencies, bwrap unshare-all; no main/settings imports",
+  "observed": {
+    "R08": "same arguments select synthetic-channel-a three times rather than rotate",
+    "R12": "/books is reported present in /books-old/series",
+    "R15": "skip_type_keywords=True raises UnboundLocalError",
+    "R16": "Café parses to café rather than cafe",
+    "R17": "lowercase identifiers: raises IndexError"
+  },
+  "production_fixes": "none",
+  "reproduction_script": "import ast\nimport functools\nimport json\nimport os\nimport string\nfrom pathlib import Path\n\nimport regex\nfrom unidecode import unidecode\n\nsource = Path('/baseline.py').read_text()\nnames = {'normalize_str', 'remove_dual_space', 'parse_words', 'contains_unicode', 'get_identifiers', 'pick_webhook', 'normalize_path', 'is_root_present'}\nnodes = [node for node in ast.parse(source).body if isinstance(node, ast.FunctionDef) and node.name in names]\nnamespace = {'re': regex, 'lru_cache': functools.lru_cache, 'os': os, 'string': string, 'unidecode': unidecode, 'dual_space_pattern': regex.compile(r'(\\s{2,})'), 'last_hook_index': None, 'discord_webhook_url': ['synthetic-channel-a', 'synthetic-channel-b']}\nexec(compile(ast.Module(body=nodes, type_ignores=[]), '/baseline.py', 'exec'), namespace)\nresults = {}\ntry:\n    namespace['normalize_str']('The Sample Manga', skip_type_keywords=True)\nexcept UnboundLocalError as error:\n    results['R15'] = {'observed': type(error).__name__, 'desired': 'skip_type_keywords remains usable without an uninitialized local'}\nelse:\n    raise AssertionError('R15 not reproduced')\ntry:\n    namespace['get_identifiers']('identifiers: synthetic-123')\nexcept IndexError as error:\n    results['R17'] = {'observed': type(error).__name__, 'desired': 'case-insensitive label parsing, explicit malformed-input outcome'}\nelse:\n    raise AssertionError('R17 not reproduced')\nwords = namespace['parse_words']('Café')\nassert words == ['café']\nresults['R16'] = {'observed': words, 'desired': ['cafe']}\nhooks = [namespace['pick_webhook'](None) for _ in range(3)]\nassert hooks == ['synthetic-channel-a'] * 3\nresults['R08'] = {'observed': hooks, 'desired': ['synthetic-channel-a', 'synthetic-channel-b', 'synthetic-channel-a']}\ncontainment = namespace['is_root_present']('/books', '/books-old/series')\nassert containment is True\nresults['R12'] = {'observed': containment, 'desired': False}\nprint(json.dumps({'scope': 'exact reviewed AST function bodies; explicit pure dependencies; no application import', 'results': results}, ensure_ascii=False))\n"
+}

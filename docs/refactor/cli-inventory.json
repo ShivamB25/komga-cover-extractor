@@ -1,0 +1,77 @@
+[
+  {
+    "path": "komga_cover_extractor.py",
+    "line": 1359,
+    "declaration": "parser.add_argument('-p', '--paths', help='The path/paths to be scanned for cover extraction.', action='append', nargs='*', required=False)"
+  },
+  {
+    "path": "komga_cover_extractor.py",
+    "line": 1367,
+    "declaration": "parser.add_argument('-df', '--download_folders', help='The download folder/download folders for processing, renaming, and moving of downloaded files. (Optional, still in testing, requires manual uncommenting of optional method calls at the bottom of the script.)', action='append', nargs='*', required=False)"
+  },
+  {
+    "path": "komga_cover_extractor.py",
+    "line": 1375,
+    "declaration": "parser.add_argument('-wh', '--webhook', action='append', nargs='*', help='The discord webhook url for notifications about changes and errors.', required=False)"
+  },
+  {
+    "path": "komga_cover_extractor.py",
+    "line": 1383,
+    "declaration": "parser.add_argument('-bwc', '--bookwalker_check', help='Checks for new releases on bookwalker.', required=False)"
+  },
+  {
+    "path": "komga_cover_extractor.py",
+    "line": 1389,
+    "declaration": "parser.add_argument('-c', '--compress', help='Compresses the extracted cover images.', required=False)"
+  },
+  {
+    "path": "komga_cover_extractor.py",
+    "line": 1395,
+    "declaration": "parser.add_argument('-cq', '--compress_quality', help='The quality of the compressed cover images.', required=False)"
+  },
+  {
+    "path": "komga_cover_extractor.py",
+    "line": 1401,
+    "declaration": "parser.add_argument('-bwk_whs', '--bookwalker_webhook_urls', help='The webhook urls for the bookwalker check.', action='append', nargs='*', required=False)"
+  },
+  {
+    "path": "komga_cover_extractor.py",
+    "line": 1409,
+    "declaration": "parser.add_argument('-wd', '--watchdog', help='Uses the watchdog library to watch for file changes in the download folders.', required=False)"
+  },
+  {
+    "path": "komga_cover_extractor.py",
+    "line": 1415,
+    "declaration": "parser.add_argument('-nw', '--new_volume_webhook', help='If passed in, the new volume release notification will be redirected to this single discord webhook channel.', required=False)"
+  },
+  {
+    "path": "komga_cover_extractor.py",
+    "line": 1421,
+    "declaration": "parser.add_argument('-ltf', '--log_to_file', help='Whether or not to log the changes and errors to a file.', required=False)"
+  },
+  {
+    "path": "komga_cover_extractor.py",
+    "line": 1427,
+    "declaration": "parser.add_argument('--watchdog_discover_new_files_check_interval', help='The amount of seconds to sleep before checking again if all the files are fully transferred.', required=False)"
+  },
+  {
+    "path": "komga_cover_extractor.py",
+    "line": 1432,
+    "declaration": "parser.add_argument('--watchdog_file_transferred_check_interval', help='The seconds to sleep between file size checks when determining if a file is fully transferred.', required=False)"
+  },
+  {
+    "path": "komga_cover_extractor.py",
+    "line": 1437,
+    "declaration": "parser.add_argument('--output_covers_as_webp', help='Outputs the covers as WebP format instead of jpg format.', required=False)"
+  },
+  {
+    "path": "addons/qbit_torrent_unchecker/qbit_torrent_unchecker.py",
+    "line": 61,
+    "declaration": "parser.add_argument('-p', '--paths', help='Paths to check for existing series', action='append', nargs='*', required=True)"
+  },
+  {
+    "path": "addons/qbit_torrent_unchecker/qbit_torrent_unchecker.py",
+    "line": 69,
+    "declaration": "parser.add_argument('-df', '--download_folders', help='The download folder/download folders for processing, renaming, and moving of downloaded files. (Optional, still in testing, requires manual uncommenting of optional method calls at the bottom of the script.)', action='append', nargs='*', required=False)"
+  }
+]
