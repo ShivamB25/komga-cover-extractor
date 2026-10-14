@@ -1,4 +1,4 @@
-"""Stateful qBittorrent protocol and journal tests with no network."""
+"""Stateful qBittorrent protocol and journal tests against isolated stand-ins."""
 from __future__ import annotations
 
 import copy
@@ -8,14 +8,17 @@ import json
 import os
 import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from email.message import Message
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from threading import Barrier, Event
+from threading import Barrier, Event, Thread
 from types import SimpleNamespace
 from typing import cast
 from urllib.parse import parse_qs, urlsplit
+from zipfile import ZipFile
 
 import pytest
 
@@ -227,6 +230,58 @@ def invoke(client: HttpClient, state: StateStore, *, authorization: RunAuthoriza
                         options={"qbittorrent_target_category": "books", **(options or {})},
                         authorization=authorization, state=state, journal_ready=journal_ready or prepare,
                         cancel=cancel or Event(), once=once, on_ready=on_ready, policy_version=policy_version)
+
+
+@contextmanager
+def loopback_client(server: Server, cancel: Event | None = None) -> Iterator[HttpClient]:
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            prepared = requests.Request(
+                self.command, f"http://{self.headers['Host']}{self.path}",
+                headers=dict(self.headers), data=body,
+            ).prepare()
+            try:
+                response = server.send(prepared)
+            except requests.RequestException:
+                self.close_connection = True
+                return
+            content = response.raw.read()
+            self.send_response(response.status_code)
+            for name, value in response.headers.items():
+                self.send_header(name, value)
+            self.end_headers()
+            response.close()
+            self.wfile.write(content)
+
+        do_POST = do_GET
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+    listener = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=listener.serve_forever)
+    thread.start()
+    try:
+        with HttpClient(f"http://127.0.0.1:{listener.server_port}/prefix/",
+                        max_attempts=1, cancel=cancel) as client:
+            yield client
+    finally:
+        listener.shutdown()
+        listener.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.fixture
+def torrent_catalog(tmp_path: Path) -> LibrarySnapshot:
+    root = tmp_path / "library"
+    series = root / "Series"
+    series.mkdir(parents=True)
+    book = series / "Series v01 (Digital).cbz"
+    with ZipFile(book, "w") as archive:
+        archive.writestr("ComicInfo.xml", "<ComicInfo><Title>Series</Title></ComicInfo>")
+    release = parse_release(FileObservation(book, root_role="library"), PARSING)
+    return LibrarySnapshot((release,), (LibraryRoot(root),))
 
 
 def test_preview_and_local_apply_never_authorize_remote_effects(tmp_path: Path) -> None:
@@ -1139,3 +1194,356 @@ def test_failed_dispatch_is_not_reclassified_as_a_pending_preflight_retry(tmp_pa
     assert state.get_job(failed.job_id) == failed
     assert server.mutations == [("start", {"hashes": HASH})]
     assert server.torrents[HASH]["state"] == "pausedDL"
+
+
+@pytest.mark.parametrize("prior_state", ["pending", "failed"])
+@pytest.mark.parametrize("action", ["priority", "start", "remove"])
+def test_unsent_mutation_requires_fresh_authorization_and_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, torrent_catalog: LibrarySnapshot,
+    action: str, prior_state: str,
+) -> None:
+    from komga_cover_extractor.infrastructure import workers
+
+    files = make_files("Series v02.cbz" if action == "start" else "Series v01.cbz")
+    if action == "remove":
+        files[0]["priority"] = 0
+    server = Server(files)
+    state = StateStore(tmp_path / "state")
+    authorization = RunAuthorization(allow_remote=True, allow_torrent_removal=action == "remove")
+    with loopback_client(server) as client:
+        with monkeypatch.context() as quota:
+            observations = 0
+            def provider() -> LibrarySnapshot:
+                nonlocal observations
+                observations += 1
+                if observations == 2:
+                    quota.setattr(workers, "JOB_REQUEST_LIMITS", {**workers.JOB_REQUEST_LIMITS, "http": 1})
+                return torrent_catalog
+            first = invoke(client, state, authorization=authorization, provider=provider)
+        pending, = state.list_jobs(kind="qbit_action", limit=10)
+        assert (first.exit_code, first.committed, first.decisions[-1].reason) == (2, 0, "http_worker_failed")
+        assert (pending.state, pending.error) == ("pending", "http_worker_failed")
+        if prior_state == "failed":
+            state.put_job(pending.job_id, pending.kind, pending.payload,
+                          state="failed", error=pending.error)
+        prior = state.get_job(pending.job_id)
+        assert prior is not None and (prior.state, prior.error) == (prior_state, "http_worker_failed")
+        assert server.mutations == []
+        assert (server.torrents[HASH]["state"], server.files[HASH][0]["priority"]) == (
+            "pausedDL", 0 if action == "remove" else 1,
+        )
+        for unauthorized in (RunAuthorization(), RunAuthorization(apply=True)):
+            preview = invoke(client, state, authorization=unauthorized, provider=lambda: torrent_catalog)
+            assert (preview.exit_code, preview.committed, preview.planned) == (0, 0, 0 if action == "remove" else 1)
+            assert state.get_job(prior.job_id) == prior
+            assert server.mutations == []
+        if action == "remove":
+            retained = invoke(client, state, authorization=RunAuthorization(allow_remote=True),
+                              provider=lambda: torrent_catalog)
+            assert (retained.exit_code, retained.committed, retained.decisions[-1].reason) == (
+                0, 0, "qbit_all_excluded_torrent_retained",
+            )
+            assert state.get_job(prior.job_id) == prior
+            assert HASH in server.torrents and server.mutations == []
+        server.torrents[HASH]["progress"] = 0.25
+        server.files[HASH][0]["progress"] = 0.5
+        server.version = "2.8.2"
+        second = invoke(client, state, authorization=authorization, provider=lambda: torrent_catalog,
+                        policy_version="fresh-policy", options={"qbit_target_states": ("pausedDL",)})
+    assert (second.exit_code, second.committed) == (0, 1)
+    assert server.mutations == [{
+        "priority": ("filePrio", {"hash": HASH, "id": "0", "priority": "0"}),
+        "start": ("resume", {"hashes": HASH}),
+        "remove": ("delete", {"hashes": HASH, "deleteFiles": "false"}),
+    }[action]]
+    completed, = state.list_jobs(kind="qbit_action", limit=10)
+    assert (completed.job_id, completed.state) == (prior.job_id, "complete")
+    assert completed.payload["policy_version"] == "fresh-policy"
+    assert completed.payload["target_states"] == ["pausedDL"]
+    assert cast(dict[str, object], completed.payload["torrent"])["progress"] == 0.25
+    assert cast(list[dict[str, object]], completed.payload["files"])[0]["progress"] == 0.5
+    if action == "remove":
+        assert HASH not in server.torrents
+    else:
+        assert (server.torrents[HASH]["state"], server.files[HASH][0]["priority"]) == (
+            "downloading" if action == "start" else "pausedDL", 1 if action == "start" else 0,
+        )
+
+
+@pytest.mark.parametrize("prior_state", ["pending", "failed"])
+@pytest.mark.parametrize(("change", "reason"), [
+    ("generation", "qbit_observation_changed"),
+    ("files", "qbit_observation_changed"),
+    ("progress", "qbit_observation_changed"),
+    ("category", "qbit_observation_changed"),
+    ("version", "qbit_server_version_changed"),
+    ("library", "qbit_library_decision_changed"),
+    ("cancel", "qbit_cancelled"),
+])
+def test_unsent_retry_revalidates_before_a_single_effect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, torrent_catalog: LibrarySnapshot,
+    change: str, reason: str, prior_state: str,
+) -> None:
+    from komga_cover_extractor.infrastructure import workers
+
+    server = Server(make_files("Series v02.cbz"))
+    state = StateStore(tmp_path / "state")
+    cancel = Event()
+    with loopback_client(server, cancel) as client:
+        with monkeypatch.context() as quota:
+            observations = 0
+            def seed_provider() -> LibrarySnapshot:
+                nonlocal observations
+                observations += 1
+                if observations == 2:
+                    quota.setattr(workers, "JOB_REQUEST_LIMITS", {**workers.JOB_REQUEST_LIMITS, "http": 1})
+                return torrent_catalog
+            first = invoke(client, state, authorization=RunAuthorization(allow_remote=True),
+                           provider=seed_provider, cancel=cancel)
+        pending, = state.list_jobs(kind="qbit_action", limit=10)
+        assert (first.committed, pending.state, server.mutations) == (0, "pending", [])
+        if prior_state == "failed":
+            state.put_job(pending.job_id, pending.kind, pending.payload,
+                          state="failed", error=pending.error)
+            prior = state.get_job(pending.job_id)
+            assert prior is not None and prior.state == "failed"
+        def before(endpoint: str, data: dict[str, str]) -> None:
+            if endpoint == "info" and data.get("hashes"):
+                if change == "generation":
+                    server.torrents[HASH]["added_on"] = 200
+                elif change == "files":
+                    server.files[HASH][0]["index"] = 7
+                elif change == "progress":
+                    server.files[HASH][0]["progress"] = 0.5
+                elif change == "category":
+                    server.torrents[HASH]["category"] = "other"
+                elif change == "version":
+                    server.version = "2.8.2"
+        server.before = before
+        fresh_observations = 0
+        def provider() -> LibrarySnapshot:
+            nonlocal fresh_observations
+            fresh_observations += 1
+            if fresh_observations == 2:
+                if change == "library":
+                    return LibrarySnapshot(available=False)
+                if change == "cancel":
+                    cancel.set()
+            return torrent_catalog
+        second = invoke(client, state, cancel=cancel, authorization=RunAuthorization(allow_remote=True),
+                        provider=provider, policy_version="fresh-policy")
+        assert (second.exit_code, second.committed, second.decisions[-1].reason) == (3, 0, reason)
+        after = state.get_job(pending.job_id)
+        assert after is not None and (after.state, after.error) == ("pending", reason)
+        assert server.mutations == [] and server.torrents[HASH]["state"] == "pausedDL"
+        server.before = None
+        server.torrents[HASH]["category"] = "books"
+        cancel.clear()
+        third = invoke(client, state, cancel=cancel, authorization=RunAuthorization(allow_remote=True),
+                       provider=lambda: torrent_catalog, policy_version="fresh-policy")
+    assert (third.exit_code, third.committed, server.torrents[HASH]["state"]) == (0, 1, "downloading")
+    assert server.mutations == [("resume" if change == "version" else "start", {"hashes": HASH})]
+    completed, = state.list_jobs(("complete",), kind="qbit_action", limit=10)
+    assert completed.payload["policy_version"] == "fresh-policy"
+
+
+@pytest.mark.parametrize(("failure", "job_state", "exit_code"), [
+    ("denied", "failed", 1),
+    ("unavailable", "needs_review", 3),
+    ("timeout_no_apply", "needs_review", 3),
+])
+def test_sent_errors_are_not_replayed_as_unsent_retries(
+    tmp_path: Path, torrent_catalog: LibrarySnapshot, failure: str, job_state: str, exit_code: int,
+) -> None:
+    server = Server(make_files("Series v02.cbz"))
+    server.failure["start"] = failure
+    state = StateStore(tmp_path / "state")
+    with loopback_client(server) as client:
+        first = invoke(client, state, authorization=RunAuthorization(allow_remote=True),
+                       provider=lambda: torrent_catalog)
+        job, = state.list_jobs(kind="qbit_action", limit=10)
+        assert (first.exit_code, first.committed, job.state) == (exit_code, 0, job_state)
+        assert server.mutations == [("start", {"hashes": HASH})]
+        assert server.torrents[HASH]["state"] == "pausedDL"
+        server.failure.clear()
+        second = invoke(client, state, authorization=RunAuthorization(allow_remote=True),
+                        provider=lambda: torrent_catalog, policy_version="fresh-policy")
+        assert (second.exit_code, second.committed) == (3, 0)
+        assert state.get_job(job.job_id) == job
+        assert server.mutations == [("start", {"hashes": HASH})]
+        assert server.torrents[HASH]["state"] == "pausedDL"
+        if job_state == "needs_review":
+            server.torrents[HASH]["state"] = "downloading"
+            reconciled = invoke(client, state, authorization=RunAuthorization(allow_remote=True),
+                                provider=lambda: torrent_catalog)
+            assert (reconciled.exit_code, reconciled.committed) == (0, 1)
+            settled = state.get_job(job.job_id)
+            assert settled is not None and settled.state == "complete"
+            assert server.mutations == [("start", {"hashes": HASH})]
+
+
+def test_started_worker_failure_retains_unknown_outcome_until_observed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, torrent_catalog: LibrarySnapshot,
+) -> None:
+    from komga_cover_extractor.integrations import http
+
+    server = Server(make_files("Series v02.cbz"))
+    state = StateStore(tmp_path / "state")
+    with loopback_client(server) as client:
+        with monkeypatch.context() as quota:
+            observations = 0
+            def provider() -> LibrarySnapshot:
+                nonlocal observations
+                observations += 1
+                if observations == 2:
+                    quota.setattr(http, "HTTP_WORKER_OUTPUT_BYTES", 1)
+                return torrent_catalog
+            first = invoke(client, state, authorization=RunAuthorization(allow_remote=True), provider=provider)
+        unknown, = state.list_jobs(kind="qbit_action", limit=10)
+        assert (first.exit_code, first.committed, first.decisions[-1].reason) == (
+            3, 0, "qbit_confirmation_unavailable",
+        )
+        assert unknown.state == "needs_review" and unknown.payload["last_observation"] is None
+        assert server.mutations == [("start", {"hashes": HASH})]
+        assert server.torrents[HASH]["state"] == "downloading"
+        preview = invoke(client, state, provider=lambda: torrent_catalog)
+        assert (preview.exit_code, preview.committed, preview.decisions[0].reason) == (
+            3, 0, "qbit_reconciliation_requires_remote_authorization",
+        )
+        assert state.get_job(unknown.job_id) == unknown
+        second = invoke(client, state, authorization=RunAuthorization(allow_remote=True),
+                        provider=lambda: torrent_catalog)
+    assert (second.exit_code, second.committed) == (0, 1)
+    settled = state.get_job(unknown.job_id)
+    assert settled is not None and settled.state == "complete"
+    assert server.mutations == [("start", {"hashes": HASH})]
+
+
+def test_unsent_start_does_not_override_a_fresh_exclusion_policy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, torrent_catalog: LibrarySnapshot,
+) -> None:
+    from komga_cover_extractor.infrastructure import workers
+
+    server = Server(make_files("Series v02.cbz"))
+    state = StateStore(tmp_path / "state")
+    with loopback_client(server) as client:
+        with monkeypatch.context() as quota:
+            observations = 0
+            def provider() -> LibrarySnapshot:
+                nonlocal observations
+                observations += 1
+                if observations == 2:
+                    quota.setattr(workers, "JOB_REQUEST_LIMITS", {**workers.JOB_REQUEST_LIMITS, "http": 1})
+                return torrent_catalog
+            first = invoke(client, state, authorization=RunAuthorization(allow_remote=True), provider=provider)
+        pending, = state.list_jobs(kind="qbit_action", limit=10)
+        assert (first.committed, pending.state, pending.payload["action"]) == (0, "pending", {"kind": "start"})
+        assert server.mutations == []
+        second = invoke(client, state, authorization=RunAuthorization(allow_remote=True),
+                        provider=lambda: torrent_catalog, policy_version="exclude-policy",
+                        options={"delete_unacceptable_files_toggle": True, "unacceptable_keywords": ("Series",)})
+    assert (second.exit_code, second.committed, second.decisions[-1].reason) == (
+        0, 1, "qbit_all_excluded_torrent_retained",
+    )
+    assert server.mutations == [("filePrio", {"hash": HASH, "id": "0", "priority": "0"})]
+    assert (server.torrents[HASH]["state"], server.files[HASH][0]["priority"]) == ("pausedDL", 0)
+    assert state.get_job(pending.job_id) == pending
+    completed, = state.list_jobs(("complete",), kind="qbit_action", limit=10)
+    assert completed.payload["policy_version"] == "exclude-policy"
+    assert completed.payload["action"] == {"kind": "priority", "name": "Series v02.cbz", "index": 0}
+
+
+def test_two_historical_unsent_claims_dispatch_one_post(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, torrent_catalog: LibrarySnapshot,
+) -> None:
+    from komga_cover_extractor.infrastructure import workers
+
+    server = Server(make_files("Series v02.cbz"))
+    stores = (StateStore(tmp_path / "state"), StateStore(tmp_path / "state"))
+    with loopback_client(server) as seed_client:
+        with monkeypatch.context() as quota:
+            observations = 0
+            def provider() -> LibrarySnapshot:
+                nonlocal observations
+                observations += 1
+                if observations == 2:
+                    quota.setattr(workers, "JOB_REQUEST_LIMITS", {**workers.JOB_REQUEST_LIMITS, "http": 1})
+                return torrent_catalog
+            seed = invoke(seed_client, stores[0], authorization=RunAuthorization(allow_remote=True), provider=provider)
+        pending, = stores[0].list_jobs(kind="qbit_action", limit=10)
+        assert (seed.committed, pending.state, server.mutations) == (0, "pending", [])
+        stores[0].put_job(pending.job_id, pending.kind, pending.payload,
+                          state="failed", error=pending.error)
+        prior = stores[0].get_job(pending.job_id)
+        assert prior is not None and (prior.state, prior.error) == ("failed", "http_worker_failed")
+        stores[1].initialize()
+        rendezvous = Barrier(2)
+        claim = StateStore.claim_job
+        def compete(self: StateStore, job_id: str, kind: str, payload: dict[str, object], *,
+                    retry_pending: bool = False, retry_failed_error: str | None = None) -> bool:
+            if retry_failed_error is not None:
+                rendezvous.wait(timeout=5)
+            return claim(self, job_id, kind, payload, retry_pending=retry_pending,
+                         retry_failed_error=retry_failed_error)
+        monkeypatch.setattr(StateStore, "claim_job", compete)
+        base_url = f"http://{server.calls[0][3]['Host']}/prefix/"
+        def attempt(index: int) -> RunResult:
+            with HttpClient(base_url, max_attempts=1) as client:
+                return invoke(client, stores[index], authorization=RunAuthorization(allow_remote=True),
+                              provider=lambda: torrent_catalog, policy_version="fresh-policy",
+                              journal_ready=lambda: Decision("observed", "fixture_journal_ready"))
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = tuple(pool.submit(attempt, index) for index in range(2))
+            results = tuple(future.result(timeout=15) for future in futures)
+    assert sorted(result.committed for result in results) == [0, 1]
+    assert sorted(result.exit_code for result in results) == [0, 3]
+    assert server.mutations == [("start", {"hashes": HASH})]
+    assert server.torrents[HASH]["state"] == "downloading"
+    completed, = stores[0].list_jobs(kind="qbit_action", limit=10)
+    assert (completed.job_id, completed.state, completed.payload["policy_version"]) == (
+        prior.job_id, "complete", "fresh-policy",
+    )
+
+
+@pytest.mark.parametrize("change", ["running", "needs_review", "error", "payload"])
+def test_historical_unsent_claim_preserves_a_competing_state_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, torrent_catalog: LibrarySnapshot, change: str,
+) -> None:
+    from komga_cover_extractor.infrastructure import workers
+
+    server = Server(make_files("Series v02.cbz"))
+    state = StateStore(tmp_path / "state")
+    with loopback_client(server) as client:
+        with monkeypatch.context() as quota:
+            observations = 0
+            def provider() -> LibrarySnapshot:
+                nonlocal observations
+                observations += 1
+                if observations == 2:
+                    quota.setattr(workers, "JOB_REQUEST_LIMITS", {**workers.JOB_REQUEST_LIMITS, "http": 1})
+                return torrent_catalog
+            first = invoke(client, state, authorization=RunAuthorization(allow_remote=True), provider=provider)
+        pending, = state.list_jobs(kind="qbit_action", limit=10)
+        assert (first.committed, pending.state, server.mutations) == (0, "pending", [])
+        state.put_job(pending.job_id, pending.kind, pending.payload, state="failed", error=pending.error)
+        claim = state.claim_job
+        competitor = None
+        def compete(job_id: str, kind: str, payload: dict[str, object], *,
+                    retry_pending: bool = False, retry_failed_error: str | None = None) -> bool:
+            nonlocal competitor
+            if retry_failed_error is not None:
+                competing_payload = copy.deepcopy(payload)
+                if change == "payload":
+                    competing_payload["policy_version"] = "competing-policy"
+                competing_error = "http_403" if change == "error" else retry_failed_error
+                competing_state = "running" if change == "running" else "needs_review" if change == "needs_review" else "failed"
+                state.put_job(job_id, kind, competing_payload, state=competing_state, error=competing_error)
+                competitor = state.get_job(job_id)
+            return claim(job_id, kind, payload, retry_pending=retry_pending,
+                         retry_failed_error=retry_failed_error)
+        monkeypatch.setattr(state, "claim_job", compete)
+        second = invoke(client, state, authorization=RunAuthorization(allow_remote=True),
+                        provider=lambda: torrent_catalog, policy_version="fresh-policy")
+    assert (second.exit_code, second.committed) == (3, 0)
+    assert competitor is not None and state.get_job(pending.job_id) == competitor
+    assert server.mutations == [] and server.torrents[HASH]["state"] == "pausedDL"

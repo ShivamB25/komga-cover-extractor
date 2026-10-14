@@ -57,7 +57,7 @@ class CoverPolicy:
             raise ValueError("cover_patterns must contain regular expressions")
         object.__setattr__(self, "cover_patterns", patterns)
         object.__setattr__(self, "compiled_patterns", tuple(regex.compile(pattern, regex.IGNORECASE) for pattern in patterns))
-        encoded = json.dumps({"rule_version": 2, "policy": self.as_dict()},
+        encoded = json.dumps({"rule_version": 3, "policy": self.as_dict()},
                              sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         object.__setattr__(self, "generation_fingerprint", sha256(encoded).hexdigest())
 
@@ -142,6 +142,8 @@ def select_cover_candidates(
     if release_kind == "chapter" and not (policy.chapter_support_toggle and policy.extract_chapter_covers):
         return CoverSelection("absent", "chapter_cover_disabled")
     candidates = image_members(members)
+    if not is_epub:
+        candidates = tuple(name for name in candidates if PurePosixPath(name).suffix in IMAGE_SUFFIXES)
     if len(candidates) > policy.archive_policy.cover_max_candidates:
         return CoverSelection("invalid_input", "cover_candidate_limit")
     diagnostics: tuple[str, ...] = ()

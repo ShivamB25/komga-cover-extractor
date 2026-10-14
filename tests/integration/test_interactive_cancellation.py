@@ -112,8 +112,9 @@ def _manifest(root: Path) -> dict[str, object]:
     return result
 
 
-def _cancel_at_prompt(
+def _run_at_prompt(
     workspace: Path, command: str, books: tuple[Path, ...], *, prompt: str, apply: bool,
+    answers: bytes | None = None,
 ) -> dict[str, Any]:
     environment = {
         "PATH": os.environ.get("PATH", os.defpath),
@@ -141,6 +142,10 @@ def _cancel_at_prompt(
     try:
         attributes = termios.tcgetattr(slave)
         attributes[3] &= ~termios.ECHO
+        if answers is not None:
+            attributes[3] &= ~termios.ICANON
+            attributes[6][termios.VMIN] = 1
+            attributes[6][termios.VTIME] = 0
         termios.tcsetattr(slave, termios.TCSANOW, attributes)
         process = subprocess.Popen(
             invocation, cwd=workspace, env=environment, stdin=slave, stderr=slave,
@@ -178,22 +183,29 @@ def _cancel_at_prompt(
         assert captured["stdout"] == b"", "CLI completed instead of waiting for the choice"
         assert process.poll() is None
         started = time.monotonic()
-        process.send_signal(signal.SIGTERM)
-        deadline = started + 5
+        if answers is None:
+            process.send_signal(signal.SIGTERM)
+        else:
+            assert os.write(master, answers) == len(answers)
+        deadline = started + (5 if answers is None else 30)
         while process.poll() is None or selector.get_map():
             drain()
-            assert time.monotonic() < deadline, f"SIGTERM did not stop the pending choice\n{captured!r}"
+            assert time.monotonic() < deadline, f"CLI did not finish the supplied terminal action\n{captured!r}"
         process.wait(timeout=1)
-        assert process.returncode == 143, captured
-        assert time.monotonic() - started < 5
         with pytest.raises(ProcessLookupError):
             os.killpg(process.pid, 0)
         payload = json.loads(captured["stdout"])
-        assert payload["exit_code"] == 143
-        assert payload["ok"] is False
-        assert payload["counts"] == {"planned": 0, "committed": 0, "skipped": 0, "failed": 0}
-        assert payload["plans"] == []
-        assert payload["deferred_deliveries"] == []
+        if answers is None:
+            assert process.returncode == 143, captured
+            assert time.monotonic() - started < 5
+            assert payload["exit_code"] == 143
+            assert payload["ok"] is False
+            assert payload["counts"] == {"planned": 0, "committed": 0, "skipped": 0, "failed": 0}
+            assert payload["plans"] == []
+            assert payload["deferred_deliveries"] == []
+        else:
+            assert process.returncode == 0, captured
+            assert payload["exit_code"] == 0
         return payload
     finally:
         selector.close()
@@ -225,7 +237,7 @@ def test_sigterm_cancels_pending_header_rename_without_terminal_input(workspace:
     sidecar.write_bytes(b"existing same-stem artwork retained during cancellation\n")
     before = _manifest(workspace)
 
-    payload = _cancel_at_prompt(
+    payload = _run_at_prompt(
         workspace, "run", (), apply=apply,
         prompt=f"Rename {str(source)!r} to {str(destination)!r}? Type rename or keep: ",
     )
@@ -258,7 +270,7 @@ def test_sigterm_cancels_pending_native_conversion_replacement_without_terminal_
     sidecar.write_bytes(b"existing destination artwork retained during cancellation\n")
     before = _manifest(workspace)
 
-    payload = _cancel_at_prompt(
+    payload = _run_at_prompt(
         workspace, "convert", (source,), apply=apply,
         prompt=f"Replace {str(destination)!r} and retain its previous bytes? Type replace to authorize, or keep: ",
     )
@@ -270,3 +282,21 @@ def test_sigterm_cancels_pending_native_conversion_replacement_without_terminal_
     assert destination.read_bytes() == existing
     assert sidecar.read_bytes() == b"existing destination artwork retained during cancellation\n"
     assert _manifest(workspace) == before
+
+
+def test_batched_header_answers_authorize_only_the_selected_book(workspace: Path) -> None:
+    pytest.importorskip("filetype", reason="real header observations require the conversion extra")
+    _configure(workspace, correct_headers=True)
+    renamed = workspace / "downloads" / "Series v01.cbr"
+    kept = workspace / "downloads" / "Series v02.cbr"
+    renamed_bytes, kept_bytes = _zip(renamed), _zip(kept)
+    destination = renamed.with_suffix(".cbz")
+    payload = _run_at_prompt(
+        workspace, "run", (), apply=True, answers=b"rename\nkeep\n",
+        prompt=f"Rename {str(renamed)!r} to {str(destination)!r}? Type rename or keep: ",
+    )
+    assert destination.read_bytes() == renamed_bytes
+    assert not renamed.exists()
+    assert kept.read_bytes() == kept_bytes
+    assert not kept.with_suffix(".cbz").exists()
+    assert payload["counts"]["committed"] == 1

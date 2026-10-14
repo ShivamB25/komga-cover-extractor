@@ -12,6 +12,7 @@ from komga_cover_extractor.application.watch import WatchCoordinator
 from komga_cover_extractor.domain.decisions import Decision, RunAuthorization, RunResult
 from komga_cover_extractor.domain.libraries import LibraryRoot
 from komga_cover_extractor.domain.operations import FileFingerprint
+from komga_cover_extractor.infrastructure.filesystem import fingerprint
 from komga_cover_extractor.infrastructure.state import StateStore
 from komga_cover_extractor.infrastructure.zip_archive import ArchivePolicy
 
@@ -401,5 +402,42 @@ def test_apply_reconciliation_visits_every_no_match_input_past_the_settled_cache
         assert {path for _, books, _, _ in pipeline.received for path in books} == set(originals)
         assert coordinator.snapshot().committed == 0
         assert {path: path.read_bytes() for path in originals} == originals
+    finally:
+        coordinator.close()
+
+
+@pytest.mark.parametrize("remaining_parts", (0, 1), ids=("single-file", "shorter-multipart"))
+def test_refreshed_manifest_releases_obsolete_parts_without_stalling_dispatch(
+    tmp_path: Path, remaining_parts: int,
+) -> None:
+    clock = Clock()
+    coordinator, pipeline, root = make_coordinator(tmp_path, clock)
+    primary = root / "Series v01.cbz"
+    parts = (root / "secondary.bin", root / "obsolete.bin")
+    primary.write_bytes(b"unchanged primary")
+    for path in parts:
+        path.write_bytes(path.name.encode())
+    sources = tuple(fingerprint(path, root) for path in (primary, *parts))
+    current = list(sources)
+    coordinator.downloader_complete = lambda path: path != parts[-1]
+
+    def observe_manifest(observed: FileFingerprint) -> Decision:
+        coordinator._remember_parts(tuple(current))
+        return Decision("observed", "injected_manifest", observed.path)
+
+    coordinator._readable = observe_manifest
+    try:
+        coordinator.reconcile()
+        advance(coordinator, clock, 10)
+        assert pipeline.received == []
+        current[:] = sources[:1 + remaining_parts]
+        for path in parts[remaining_parts:]:
+            path.unlink()
+        advance(coordinator, clock, 20)
+        assert pipeline.received == [("run", (primary,), (b"unchanged primary",), RunAuthorization())]
+        assert coordinator.snapshot().planned == 1
+        assert fingerprint(primary, root) == sources[0]
+        advance(coordinator, clock, 10)
+        assert pipeline.received == [("run", (primary,), (b"unchanged primary",), RunAuthorization())]
     finally:
         coordinator.close()

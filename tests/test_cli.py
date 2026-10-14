@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import os
 import stat
@@ -7,6 +8,8 @@ import subprocess
 import sys
 import zipfile
 from pathlib import Path
+
+import pytest
 
 
 def _run_cli(cwd: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -24,6 +27,22 @@ def _run_cli(cwd: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
         text=True,
         timeout=30,
     )
+
+
+def _zip_book(path: Path) -> bytes:
+    image_module = pytest.importorskip("PIL.Image")
+    output = io.BytesIO()
+    image_module.new("RGB", (16, 16), "red").save(output, format="PNG")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("01.png", output.getvalue())
+        archive.writestr("ComicInfo.xml", "<ComicInfo><Publisher>Fixture Press</Publisher></ComicInfo>")
+    return path.read_bytes()
+
+
+def _tree_bytes(root: Path) -> dict[Path, bytes | None]:
+    return {path.relative_to(root): path.read_bytes() if path.is_file() else None
+            for path in root.rglob("*")}
 
 
 def test_root_and_subcommand_repeated_options_preserve_precedence(tmp_path: Path) -> None:
@@ -255,3 +274,150 @@ def test_profile_and_plan_output_collision_is_rejected_before_named_output(tmp_p
     )
     assert result.returncode == 2
     assert not output.exists()
+
+
+@pytest.mark.parametrize("command", ["inspect", "extract", "convert"])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_selected_nested_zip_books_keep_complete_coverage_without_configured_roots(
+    tmp_path: Path, command: str, reverse: bool,
+) -> None:
+    pytest.importorskip("lxml")
+    library, other = tmp_path / "library", tmp_path / "other"
+    books = (
+        library / "Parent v01.zip",
+        library / "Nested" / "Child v02.zip",
+        other / "Other v03.zip",
+    )
+    original = {book: _zip_book(book) for book in books}
+    before = _tree_bytes(tmp_path)
+    selected = tuple(reversed(books)) if reverse else books
+    arguments = (
+        command, *(str(book) for book in selected), "--set", "paths=[]",
+        "--set", "download_folders=[]", "--set", "state_dir=" + json.dumps(str(tmp_path / "state")),
+        "--set", "log_dir=" + json.dumps(str(tmp_path / "logs")),
+        "--set", "compare_detected_cover_to_blank_images=false",
+        "--set", "series_cover_file_names=[]", "--set", "compress_image_option=false",
+        "--set", "output_covers_as_webp=false",
+        "--set", "manual_rename=false", "--json",
+    )
+    preview = _run_cli(tmp_path, *arguments)
+    assert preview.returncode == 0, (preview.stdout, preview.stderr)
+    payload = json.loads(preview.stdout)
+    assert {release["path"]: release["number"]["values"] for release in payload["releases"]} == {
+        str(books[0]): ["1"], str(books[1]): ["2"], str(books[2]): ["3"],
+    }
+    assert payload["counts"]["planned"] == (0 if command == "inspect" else 3)
+    assert (payload["counts"]["committed"], payload["counts"]["failed"]) == (0, 0)
+    assert _tree_bytes(tmp_path) == before
+    if command == "inspect":
+        assert payload["plans"] == []
+        return
+    suffix = ".png" if command == "extract" else ".cbz"
+    destinations = {str(book.with_suffix(suffix)) for book in books}
+    assert {operation["destination"] for plan in payload["plans"] for operation in plan["operations"]} == destinations
+    applied = _run_cli(tmp_path, *arguments, "--apply")
+    assert applied.returncode == 0, (applied.stdout, applied.stderr)
+    outcome = json.loads(applied.stdout)
+    assert (outcome["counts"]["committed"], outcome["counts"]["failed"]) == (3, 0)
+    for book in books:
+        target = book.with_suffix(suffix)
+        if command == "extract":
+            with zipfile.ZipFile(book) as archive:
+                assert target.read_bytes() == archive.read("01.png")
+            assert book.read_bytes() == original[book]
+        else:
+            assert target.read_bytes() == original[book]
+            assert not book.exists()
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_explicit_configured_nested_roots_are_still_rejected(tmp_path: Path, reverse: bool) -> None:
+    library = tmp_path / "library"
+    nested = library / "Nested"
+    nested.mkdir(parents=True)
+    marker = nested / "keep.txt"
+    marker.write_bytes(b"Explicit nested roots remain invalid.")
+    before = _tree_bytes(tmp_path)
+    roots = (nested, library) if reverse else (library, nested)
+    completed = _run_cli(
+        tmp_path, "inspect", "--paths", str(roots[0]), "--paths", str(roots[1]),
+        "--set", "state_dir=" + json.dumps(str(tmp_path / "state")),
+    )
+    assert completed.returncode == 2
+    payload = json.loads(completed.stdout)
+    assert payload["decisions"][0]["status"] == "invalid_input"
+    assert _tree_bytes(tmp_path) == before
+
+
+@pytest.mark.parametrize("private_key", ["state_dir", "log_dir"])
+@pytest.mark.parametrize("relation", ["equal", "ancestor"])
+@pytest.mark.parametrize("inferred", [False, True])
+@pytest.mark.parametrize("command", ["inspect", "extract"])
+def test_private_directories_reject_configured_and_inferred_media_before_any_write(
+    tmp_path: Path, private_key: str, relation: str, inferred: bool, command: str,
+) -> None:
+    media = tmp_path / "private" / "media"
+    media.mkdir(parents=True)
+    book = media / "Series v01.zip"
+    with zipfile.ZipFile(book, "w") as archive:
+        archive.writestr("ComicInfo.xml", "<ComicInfo/>")
+    private = media if relation == "equal" else media.parent
+    before = _tree_bytes(tmp_path)
+    arguments = [
+        command, "--set", "state_dir=" + json.dumps(str(tmp_path / "state")),
+        "--set", "log_dir=" + json.dumps(str(tmp_path / "logs")),
+        "--set", private_key + "=" + json.dumps(str(private)), "--set", "log_to_file=true",
+    ]
+    if inferred:
+        arguments.extend((str(book), "--set", "paths=[]", "--set", "download_folders=[]"))
+    else:
+        arguments.extend(("--paths", str(media)))
+    if command == "extract":
+        arguments.append("--apply")
+    completed = _run_cli(tmp_path, *arguments)
+    assert completed.returncode == 2
+    payload = json.loads(completed.stdout)
+    assert payload["decisions"][0]["status"] == "invalid_input"
+    assert (payload["counts"]["planned"], payload["counts"]["committed"]) == (0, 0)
+    assert _tree_bytes(tmp_path) == before
+
+
+@pytest.mark.parametrize("private_key", ["state_dir", "log_dir"])
+def test_watch_rejects_private_ancestor_before_starting_or_creating_state(tmp_path: Path, private_key: str) -> None:
+    media = tmp_path / "private" / "media"
+    media.mkdir(parents=True)
+    marker = media / "keep.txt"
+    marker.write_bytes(b"The watch command must not start for an excluded root.")
+    before = _tree_bytes(tmp_path)
+    completed = _run_cli(
+        tmp_path, "watch", "--paths", str(media), "--apply",
+        "--set", "state_dir=" + json.dumps(str(tmp_path / "state")),
+        "--set", "log_dir=" + json.dumps(str(tmp_path / "logs")),
+        "--set", private_key + "=" + json.dumps(str(media.parent)), "--set", "log_to_file=true",
+    )
+    assert completed.returncode == 2
+    payload = json.loads(completed.stdout)
+    assert payload["decisions"][0]["status"] == "invalid_input"
+    assert _tree_bytes(tmp_path) == before
+
+
+def test_inferred_ancestor_does_not_authorize_a_symlinked_selected_parent(tmp_path: Path) -> None:
+    library, external = tmp_path / "library", tmp_path / "external"
+    library.mkdir()
+    external.mkdir()
+    books = (library / "Series v01.zip", external / "Series v02.zip")
+    for book in books:
+        with zipfile.ZipFile(book, "w") as archive:
+            archive.writestr("ComicInfo.xml", "<ComicInfo/>")
+    alias = library / "Nested"
+    alias.symlink_to(external, target_is_directory=True)
+    before = _tree_bytes(tmp_path)
+    completed = _run_cli(
+        tmp_path, "inspect", str(books[0]), str(alias / books[1].name),
+        "--set", "paths=[]", "--set", "download_folders=[]",
+        "--set", "state_dir=" + json.dumps(str(tmp_path / "state")),
+    )
+    assert completed.returncode == 2
+    payload = json.loads(completed.stdout)
+    assert any(decision["reason"] == "symlink_traversal" for decision in payload["decisions"])
+    assert _tree_bytes(tmp_path) == before

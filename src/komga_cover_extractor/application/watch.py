@@ -15,7 +15,11 @@ from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
 
 from ..covers.selection import IMAGE_SUFFIXES
 from ..domain.decisions import Decision, RunResult, Status
-from ..domain.libraries import LibraryRoot, normalize_library_roots
+from ..domain.libraries import (
+    LibraryRoot,
+    normalize_library_roots,
+    validate_private_paths,
+)
 from ..domain.operations import FileFingerprint
 from ..infrastructure.filesystem import (
     BOOK_SUFFIXES,
@@ -907,6 +911,11 @@ class WatchCoordinator:
             self._finish(job, "complete")
 
     def _remember_parts(self, sources: tuple[FileFingerprint, ...]) -> None:
+        parts = {observed.path for observed in sources[1:]}
+        for path, (owner, _) in tuple(self._archive_parts.items()):
+            if owner.path == sources[0].path and path not in parts:
+                del self._archive_parts[path]
+                self._auxiliary_samples.pop(path, None)
         job = self._pending.get(sources[0].path)
         if job is not None:
             job["part_count"] = len(sources) - 1
@@ -979,8 +988,21 @@ class WatchCoordinator:
     def _run_job(self, job: _Job) -> None:
         observed = job["fingerprint"]
         assert observed is not None
-        ready_downloads = self._ready_downloads(job)
+        if job.get("part_count", 0) > self._limit:
+            self._retry(job, Decision("review_required", "watch_archive_parts_limit", observed.path))
+            return
         parts = tuple(part for owner, part in self._archive_parts.values() if owner == observed)
+        if len(parts) != job.get("part_count", 0):
+            readable = self._readable(observed)
+            if readable.status != "observed":
+                if readable.status == "cancelled":
+                    job["phase"] = "waiting_ready"
+                    self._save(job)
+                else:
+                    self._retry(job, readable)
+                return
+            parts = tuple(part for owner, part in self._archive_parts.values() if owner == observed)
+        ready_downloads = self._ready_downloads(job)
         if len(parts) != job.get("part_count", 0) or any(part not in ready_downloads for part in parts):
             job["phase"] = "waiting_ready"
             job["next_sample"] = self.clock() + self._sample_interval
@@ -1187,6 +1209,13 @@ def run_watch(
     candidate_filter: Callable[[Path], bool] | None = None, invalidate: Callable[[Path], None] | None = None,
     ignored_roots: tuple[Path, ...] = (), install_signal_handlers: bool = True,
 ) -> RunResult:
+    try:
+        validate_private_paths(
+            tuple(root.path for root in request.roots or pipeline.roots),
+            state_dir=pipeline.state_dir, log_dir=getattr(pipeline, "log_dir", None),
+        )
+    except (ValueError, TypeError) as error:
+        return RunResult((Decision("invalid_input", "private_directory_contains_media_root", candidates=(str(error),)),))
     try:
         coordinator = WatchCoordinator(
             pipeline, request, options=options, state=state, journal_ready=journal_ready,

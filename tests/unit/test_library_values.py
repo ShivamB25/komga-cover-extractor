@@ -6,6 +6,7 @@ from komga_cover_extractor.domain.libraries import (
     LibraryRoot,
     LibrarySnapshot,
     PathMapping,
+    infer_book_roots,
     is_within_root,
     map_local_path,
     normalize_library_roots,
@@ -59,6 +60,35 @@ def test_duplicate_root_with_conflicting_settings_is_rejected() -> None:
 def test_distinct_nested_roots_are_rejected() -> None:
     with pytest.raises(ValueError, match="nested library roots"):
         normalize_library_roots((LibraryRoot(Path("/books")), LibraryRoot(Path("/books/sub"))))
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_inferred_book_roots_keep_outermost_parents_and_disjoint_neighbors(reverse: bool) -> None:
+    books = (
+        Path("/books/Series v01.zip"),
+        Path("/books/Nested/Deep/Series v02.zip"),
+        Path("/books/Nested/Series v03.zip"),
+        Path("/books-old/Other v01.zip"),
+        Path("/other/Another v01.zip"),
+        Path("/books/../books/Series v04.zip"),
+    )
+    roots = infer_book_roots(tuple(reversed(books)) if reverse else books)
+    assert roots == (
+        LibraryRoot(Path("/books")),
+        LibraryRoot(Path("/books-old")),
+        LibraryRoot(Path("/other")),
+    )
+    assert all(sum(root.contains(book) for root in roots) == 1 for book in books)
+
+
+def test_inferred_book_roots_do_not_resolve_symlink_parents(tmp_path: Path) -> None:
+    target = tmp_path / "target"
+    target.mkdir()
+    alias = tmp_path / "alias"
+    alias.symlink_to(target, target_is_directory=True)
+    roots = infer_book_roots((alias / "Nested" / "Series v02.zip", alias / "Series v01.zip"))
+    assert roots == (LibraryRoot(alias),)
+    assert not roots[0].contains(target / "Series v01.zip")
 
 
 def test_path_mapping_chooses_longest_component_prefix() -> None:

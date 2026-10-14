@@ -372,13 +372,12 @@ def test_page_limit_is_an_incomplete_report_and_does_not_schedule_delivery() -> 
     assert [relative for _, relative, _ in client.calls] == ["search/?word=Series&np=0", "search/?word=Series&page=1&qcat=2", "book-1/", "book-2/"]
 
 
-def test_download_overlap_and_mixed_roots_are_not_searched() -> None:
+def test_download_only_and_mixed_folders_are_not_searched() -> None:
     client = Client({})
-    for role in ("download", "both"):
-        result = check_bookwalker_releases([local(ReleaseNumber.scalar("1"), role=role)], client=client.http,
-                                          number_policy=NumberPolicy(), required_similarity_score=0.979,
-                                          authorization=RunAuthorization(), request_interval_seconds=0)
-        assert [(item.status, item.reason) for item in result.decisions] == [("no_match", "bookwalker_no_library_volumes")]
+    result = check_bookwalker_releases([local(ReleaseNumber.scalar("1"), role="download")], client=client.http,
+                                      number_policy=NumberPolicy(), required_similarity_score=0.979,
+                                      authorization=RunAuthorization(), request_interval_seconds=0)
+    assert [(item.status, item.reason) for item in result.decisions] == [("no_match", "bookwalker_no_library_volumes")]
     result = check_bookwalker_releases([local(ReleaseNumber.scalar("1")), local(ReleaseNumber.scalar("2"), novel=True)],
                                       client=client.http, number_policy=NumberPolicy(), required_similarity_score=0.979,
                                       authorization=RunAuthorization(), request_interval_seconds=0)
@@ -488,3 +487,21 @@ def test_raised_search_after_single_series_observation_does_not_relax_a_later_se
     assert [relative for _, relative, _ in later.calls] == [
         "search/?word=Northfield+Library&np=0", "search/?word=Northfield+Library&page=1&qcat=3", "item-1/",
     ]
+
+
+def test_dual_role_library_reports_existing_and_missing_releases_without_mutating_books(tmp_path: Path) -> None:
+    source = tmp_path / "Series" / "Series v01.cbz"
+    source.parent.mkdir()
+    source.write_bytes(b"existing dual-role library volume")
+    observed = parse_release(FileObservation(source, root_role="both"), ParsingPolicy())
+    client = Client(pages())
+    result = check_bookwalker_releases(
+        (observed,), client=client.http, number_policy=NumberPolicy(), required_similarity_score=0.979,
+        authorization=RunAuthorization(), clock=lambda: TODAY, request_interval_seconds=0,
+    )
+    comparisons = result.missing_releases[0]["comparisons"]
+    assert [(item["book"]["volume_number"], item["status"]) for item in comparisons] == [
+        ("1", "existing"), ("2", "missing"), ("3", "missing"), ("4", "review_required"),
+    ]
+    assert result.missing_releases[0]["delivery_authorized"] is False
+    assert source.read_bytes() == b"existing dual-role library volume"

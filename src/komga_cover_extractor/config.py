@@ -22,6 +22,8 @@ from urllib.parse import urlsplit
 
 import regex
 
+from .domain.libraries import validate_private_paths
+
 MAX_CONFIG_BYTES = 1024 * 1024
 _ENV_PREFIX = "KCE_"
 _REDACTED = "********"
@@ -1262,6 +1264,14 @@ def _read_toml(path: Path) -> Mapping[str, object]:
 
 
 def _validate_dependencies(values: Mapping[str, object]) -> None:
+    try:
+        validate_private_paths(
+            (*cast(tuple[Path, ...], values["paths"]), *cast(tuple[Path, ...], values["download_folders"])),
+            state_dir=cast(Path, values["state_dir"]), log_dir=cast(Path, values["log_dir"]),
+        )
+    except ValueError as error:
+        raise ConfigurationError(str(error)) from None
+
     def require_nonempty(key: str, reason: str) -> None:
         value = values[key]
         if not isinstance(value, str) or value.strip() == "":

@@ -124,7 +124,7 @@ def check_bookwalker_releases(
     """
     folders: dict[Path, dict[Path, ReleaseSnapshot]] = {}
     for release in releases:
-        if release.kind != "volume" or release.observation.root_role in {"download", "both"}:
+        if release.kind != "volume" or release.observation.root_role == "download":
             continue
         folders.setdefault(release.parent, {})[release.path] = release
     if not folders:

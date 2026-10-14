@@ -18,6 +18,7 @@ from komga_cover_extractor.application.pipeline import RunRequest
 from komga_cover_extractor.bootstrap import open_pipeline
 from komga_cover_extractor.config import Configuration, validate_config
 from komga_cover_extractor.domain.decisions import RunAuthorization, RunResult
+from komga_cover_extractor.domain.libraries import LibraryRoot
 from komga_cover_extractor.domain.operations import (
     ArtifactSpec,
     Operation,
@@ -116,6 +117,110 @@ def test_single_book_inspection_does_not_open_unselected_corrupt_archives(tmp_pa
     assert ("Publisher", "Fixture Press") in result.releases[0].observation.metadata
     assert selected.read_bytes() == original
     assert not (tmp_path / "state").exists()
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_direct_pipeline_infers_complete_nested_book_coverage(tmp_path: Path, reverse: bool) -> None:
+    _capabilities()
+    config = _config(tmp_path, paths=[], download_folders=[])
+    library, other = tmp_path / "library", tmp_path / "other"
+    books = (
+        library / "Parent v01.zip", library / "Nested" / "Child v02.zip",
+        other / "Other v03.zip",
+    )
+    original = {book: _book(book) for book in books}
+    selected = tuple(reversed(books)) if reverse else books
+    with open_pipeline(config) as pipeline:
+        result = pipeline.run(RunRequest("inspect", books=selected))
+    assert (result.exit_code, result.planned, result.committed, result.failed) == (0, 0, 0, 0)
+    assert {release.path: release.number.values for release in result.releases} == {
+        books[0]: (1,), books[1]: (2,), books[2]: (3,),
+    }
+    observed_roots: dict[Path, Path] = {}
+    for release in result.releases:
+        observed = release.observation.fingerprint
+        assert observed is not None
+        observed_roots[release.path] = observed.root
+    assert observed_roots == {books[0]: library, books[1]: library, books[2]: other}
+    assert {release.observation.root_role for release in result.releases} == {"library"}
+    assert {book: book.read_bytes() for book in books} == original
+    assert not config.state_dir.exists() and not config.log_dir.exists()
+
+
+@pytest.mark.parametrize("private_key", ["state_dir", "log_dir"])
+@pytest.mark.parametrize("inferred", [False, True])
+def test_open_pipeline_rejects_private_ancestor_of_effective_request_roots_without_writes(
+    tmp_path: Path, private_key: str, inferred: bool,
+) -> None:
+    media = tmp_path / "private" / "media"
+    config = _config(tmp_path, paths=[], download_folders=[], **{private_key: str(media.parent)})
+    book = media / "Series v01.zip"
+    _book(book)
+    before = {path.relative_to(tmp_path): path.read_bytes() if path.is_file() else None
+              for path in tmp_path.rglob("*")}
+    request = RunRequest(
+        "extract", books=(book,), roots=() if inferred else (LibraryRoot(media, roles=("download",)),),
+        authorization=RunAuthorization(apply=True),
+    )
+    with pytest.raises(ValueError, match=private_key + " must not equal or contain a media root"):
+        with open_pipeline(config, request=request) as pipeline:
+            pipeline.run(request)
+    assert {path.relative_to(tmp_path): path.read_bytes() if path.is_file() else None
+            for path in tmp_path.rglob("*")} == before
+
+
+@pytest.mark.parametrize("private_key", ["state_dir", "log_dir"])
+@pytest.mark.parametrize("relation", ["equal", "ancestor"])
+@pytest.mark.parametrize("inferred", [False, True])
+def test_direct_pipeline_rejects_effective_media_inside_private_directories(
+    tmp_path: Path, private_key: str, relation: str, inferred: bool,
+) -> None:
+    media = tmp_path / "private" / "media"
+    private = media if relation == "equal" else media.parent
+    config = _config(tmp_path, paths=[], download_folders=[], **{private_key: str(private)})
+    book = media / "Series v01.zip"
+    _book(book)
+    before = {path.relative_to(tmp_path): path.read_bytes() if path.is_file() else None
+              for path in tmp_path.rglob("*")}
+    request = RunRequest(
+        "extract", books=(book,), roots=() if inferred else (LibraryRoot(media, roles=("download",)),),
+        authorization=RunAuthorization(apply=True),
+    )
+    with open_pipeline(config) as pipeline:
+        result = pipeline.run(request)
+    assert (result.exit_code, result.planned, result.committed, result.failed) == (2, 0, 0, 0)
+    decision, = result.decisions
+    assert (decision.status, decision.reason) == ("invalid_input", "private_directory_contains_media_root")
+    assert private_key in decision.candidates[0]
+    assert "choose a private subdirectory or an unrelated directory" in decision.candidates[0]
+    assert {path.relative_to(tmp_path): path.read_bytes() if path.is_file() else None
+            for path in tmp_path.rglob("*")} == before
+
+
+def test_private_child_exclusions_preserve_visible_media_and_component_neighbors(tmp_path: Path) -> None:
+    _capabilities()
+    library = tmp_path / "library"
+    state, logs = library / "state", library / "logs"
+    config = _config(tmp_path, download_folders=[], state_dir=str(state), log_dir=str(logs))
+    books = (library / "Visible v01.cbz", library / "state-old" / "Neighbor v02.cbz")
+    original = {book: _book(book) for book in books}
+    private_books = (state / "Private v01.cbz", logs / "Private v02.cbz")
+    for book in private_books:
+        book.parent.mkdir(parents=True, exist_ok=True)
+        book.write_bytes(b"Private data is not a valid archive and must never be observed as media.")
+    before = {path.relative_to(tmp_path): path.read_bytes() if path.is_file() else None
+              for path in tmp_path.rglob("*")}
+    with open_pipeline(config) as pipeline:
+        catalog = pipeline.library_snapshot()
+        result = pipeline.run(RunRequest("inspect"))
+    assert catalog.available and catalog.reason is None
+    assert {release.path for release in catalog.releases} == set(books)
+    assert (result.exit_code, result.committed, result.failed) == (0, 0, 0)
+    assert {release.path for release in result.releases} == set(books)
+    assert all(("Publisher", "Fixture Press") in release.observation.metadata for release in result.releases)
+    assert {book: book.read_bytes() for book in books} == original
+    assert {path.relative_to(tmp_path): path.read_bytes() if path.is_file() else None
+            for path in tmp_path.rglob("*")} == before
 
 
 @pytest.mark.parametrize(("suffix", "first_member", "page_count", "grayscale", "kind"), [

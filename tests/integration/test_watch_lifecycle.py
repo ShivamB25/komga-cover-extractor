@@ -529,3 +529,34 @@ def test_actual_polling_observer_is_rebuilt_when_the_watched_root_is_replaced(tm
     finally:
         coordinator.close()
     assert all(not observer.is_alive() for observer in replacement)
+
+
+@pytest.mark.parametrize("private_directory", ("state_dir", "log_dir"))
+def test_private_directory_covering_media_refuses_before_watch_journal_or_publication(
+    tmp_path: Path, private_directory: str,
+) -> None:
+    root = tmp_path / "books"
+    root.mkdir()
+    book = root / "Series v01.cbz"
+    archive(book)
+    pipeline = FixturePipeline(root, tmp_path / "state", publish=True)
+    setattr(pipeline, private_directory, tmp_path)
+    before = {
+        path.relative_to(tmp_path): (path.stat().st_mode, path.stat().st_mtime_ns,
+                                    path.read_bytes() if path.is_file() else None)
+        for path in (tmp_path, *tmp_path.rglob("*"))
+    }
+    executor = TransactionExecutor(pipeline.state_dir, (root,))
+    result = run_watch(
+        pipeline, RunRequest("watch", once=True, authorization=RunAuthorization(apply=True)),
+        state=StateStore(pipeline.state_dir),
+        journal_ready=lambda: executor.prepare_state_root(authorization=RunAuthorization(apply=True)),
+    )
+    assert result.exit_code == 2 and result.committed == 0
+    assert any(decision.status == "invalid_input" and decision.reason == "private_directory_contains_media_root"
+               for decision in result.decisions)
+    assert {
+        path.relative_to(tmp_path): (path.stat().st_mode, path.stat().st_mtime_ns,
+                                    path.read_bytes() if path.is_file() else None)
+        for path in (tmp_path, *tmp_path.rglob("*"))
+    } == before

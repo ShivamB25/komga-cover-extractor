@@ -46,6 +46,11 @@ _STARTED_STATES = frozenset({
 })
 _JOB_KIND = "qbit_action"
 _JOB_PAGE_SIZE = 256
+_UNSENT_MUTATION_REASONS = frozenset({
+    "http_cancelled", "http_client_closed", "http_cookie_limit", "http_delivery_budget",
+    "http_worker_failed", "invalid_http_method", "invalid_http_request",
+    "invalid_http_statuses", "unsafe_http_path",
+})
 
 
 @lru_cache(maxsize=4096)
@@ -393,10 +398,15 @@ def _apply_action(
     payload = _payload(client, torrent, expected, action, options, policy_version)
     job_id = _job_id(client.endpoint_key, str(payload["generation"]), action)
     prior = state.get_job(job_id)
-    retry = (prior is not None and prior.kind == _JOB_KIND and prior.state == "pending"
+    retry = (prior is not None and prior.kind == _JOB_KIND
+             and (prior.state == "pending" or prior.state == "failed" and prior.error in _UNSENT_MUTATION_REASONS)
              and _valid_job(prior, client.endpoint_key))
     claim_payload = prior.payload if prior is not None and retry else payload
-    if not state.claim_job(job_id, _JOB_KIND, claim_payload, retry_pending=retry):
+    if retry and prior is not None and prior.state == "failed":
+        claimed = state.claim_job(job_id, _JOB_KIND, claim_payload, retry_failed_error=prior.error)
+    else:
+        claimed = state.claim_job(job_id, _JOB_KIND, claim_payload, retry_pending=retry)
+    if not claimed:
         job = state.get_job(job_id)
         reason = "qbit_action_claimed_or_interrupted" if job is not None and job.state == "running" else "qbit_action_already_attempted"
         return Decision("review_required", reason, candidates=(torrent_hash, job_id)), torrent, expected
@@ -443,7 +453,9 @@ def _apply_action(
     except HttpError as error:
         mutation_error = error
     if mutation_error is not None and not mutation_error.pending_unknown:
-        state.put_job(job_id, _JOB_KIND, payload, state="failed", error=mutation_error.reason)
+        state.put_job(job_id, _JOB_KIND, payload,
+                      state="pending" if mutation_error.reason in _UNSENT_MUTATION_REASONS else "failed",
+                      error=mutation_error.reason)
         try:
             _observe(client, torrent_hash)
         except HttpError:

@@ -234,3 +234,89 @@ def test_cancelled_multipart_wait_retains_sources_and_restart_requires_fresh_qui
             queued = coordinator.queued_count
             coordinator.enqueue(('modified', multipart_parts[0], None, False))
             assert coordinator.queued_count == queued
+
+
+def test_concurrent_multipart_primaries_progress_when_associations_are_evicted(
+    tmp_path: Path, multipart_parts: tuple[Path, ...],
+) -> None:
+    config = _config(tmp_path, dual_role=False)
+    second_folder = multipart_parts[0].parent / "Second"
+    second_folder.mkdir()
+    second_parts = tuple(second_folder / part.name for part in multipart_parts)
+    for source, destination in zip(multipart_parts, second_parts, strict=True):
+        shutil.copyfile(source, destination)
+    originals = {part: part.read_bytes() for part in (*multipart_parts, *second_parts)}
+    primaries = (multipart_parts[0], second_parts[0])
+    clock = Clock()
+    with open_pipeline(config) as pipeline:
+        state = StateStore(config.state_dir)
+        executor = TransactionExecutor(config.state_dir, tuple(root.path for root in pipeline.roots))
+        coordinator = WatchCoordinator(
+            pipeline, RunRequest('watch', authorization=RunAuthorization(apply=True)),
+            state=state, journal_ready=lambda: executor.prepare_state_root(authorization=RunAuthorization(apply=True)),
+            clock=clock, candidate_filter=lambda path: path.name.endswith('part1.rar') or path.suffix == '.cbz',
+            options={'watch_queue_capacity': 2, 'watch_max_pending_jobs': 2,
+                     'watchdog_file_transferred_check_interval': 1,
+                     'watchdog_discover_new_files_check_interval': 2,
+                     'watch_reconcile_interval_seconds': 3},
+        )
+        try:
+            assert coordinator.start().status == 'observed'
+            for primary in primaries:
+                coordinator.enqueue(('created', primary, None, False))
+            _pump_bounded(coordinator, clock, 20)
+            result = coordinator.snapshot()
+            assert (result.committed, result.failed, result.exit_code) == (2, 0, 0), result.as_dict()
+            for primary in primaries:
+                with zipfile.ZipFile(primary.with_suffix('.cbz')) as archive:
+                    assert archive.testzip() is None
+                    assert sorted(archive.namelist()) == ['vols/bigfile.txt', 'vols/smallfile.txt']
+                    assert zlib.crc32(archive.read('vols/bigfile.txt')) == 0x509ad74c
+                    assert zlib.crc32(archive.read('vols/smallfile.txt')) == 0xd08a1f86
+            records = state.list_operations()
+            assert len(records) == 2 and all(record.phase == 'complete' for record in records)
+            retained = tuple(
+                member for record in records for member in state.list_members(record.operation_id)
+                if member.kind == 'quarantine'
+            )
+            assert {member.source.path for member in retained if member.source is not None} == set(originals)
+            for member in retained:
+                assert member.source is not None and member.cleanup_path is not None
+                assert member.cleanup_path.read_bytes() == originals[member.source.path]
+                assert not member.source.path.exists()
+            _pump_bounded(coordinator, clock, 10)
+            assert coordinator.snapshot().committed == 2
+        finally:
+            coordinator.close()
+
+
+def test_multipart_snapshot_exceeding_the_bound_requires_review_without_retiring_sources(
+    tmp_path: Path, multipart_parts: tuple[Path, ...],
+) -> None:
+    config = _config(tmp_path, dual_role=False)
+    originals = {part: part.read_bytes() for part in multipart_parts}
+    clock = Clock()
+    with open_pipeline(config) as pipeline:
+        state = StateStore(config.state_dir)
+        executor = TransactionExecutor(config.state_dir, tuple(root.path for root in pipeline.roots))
+        coordinator = WatchCoordinator(
+            pipeline, RunRequest('watch', authorization=RunAuthorization(apply=True)),
+            state=state, journal_ready=lambda: executor.prepare_state_root(authorization=RunAuthorization(apply=True)),
+            clock=clock, candidate_filter=lambda path: path.name.endswith('part1.rar'),
+            options={'watch_queue_capacity': 1, 'watch_max_pending_jobs': 1,
+                     'watchdog_file_transferred_check_interval': 1,
+                     'watchdog_discover_new_files_check_interval': 2,
+                     'watch_reconcile_interval_seconds': 3},
+        )
+        try:
+            assert coordinator.start().status == 'observed'
+            _pump_bounded(coordinator, clock, 10)
+            result = coordinator.snapshot()
+            assert result.committed == 0 and result.exit_code == 3, result.as_dict()
+            assert any(decision.status == 'review_required' and decision.reason == 'watch_archive_parts_limit'
+                       for decision in result.decisions)
+            assert state.list_operations() == ()
+            assert not multipart_parts[0].with_suffix('.cbz').exists()
+            assert all(path.read_bytes() == data for path, data in originals.items())
+        finally:
+            coordinator.close()

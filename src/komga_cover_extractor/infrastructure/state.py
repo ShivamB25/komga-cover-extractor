@@ -1453,6 +1453,7 @@ class StateStore:
 
     def claim_job(
         self, job_id: str, kind: str, payload: dict[str, object], *, retry_pending: bool = False,
+        retry_failed_error: str | None = None,
     ) -> bool:
         if not job_id or len(job_id) > 200 or not kind or len(kind) > 100:
             raise ValueError("invalid durable job identity")
@@ -1472,6 +1473,13 @@ class StateStore:
                     "UPDATE jobs SET state='running',error=NULL,updated_ns=? "
                     "WHERE job_id=? AND kind=? AND state='pending' AND payload_json=?",
                     (now, job_id, kind, encoded),
+                )
+                claimed = cursor.rowcount == 1
+            if not claimed and retry_failed_error is not None:
+                cursor = connection.execute(
+                    "UPDATE jobs SET state='running',error=NULL,updated_ns=? "
+                    "WHERE job_id=? AND kind=? AND state='failed' AND payload_json=? AND error=?",
+                    (now, job_id, kind, encoded, retry_failed_error),
                 )
                 claimed = cursor.rowcount == 1
             connection.commit()

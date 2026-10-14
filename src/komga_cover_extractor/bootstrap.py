@@ -13,7 +13,12 @@ from .config import Configuration
 from .covers.selection import CoverPolicy
 from .covers.series_policy import SeriesCoverPolicy
 from .domain.decisions import Decision, RunAuthorization, RunResult
-from .domain.libraries import LibraryRoot, PathMapping
+from .domain.libraries import (
+    LibraryRoot,
+    PathMapping,
+    infer_book_roots,
+    validate_private_paths,
+)
 from .domain.releases import ReleaseSnapshot
 from .infrastructure.state import StateStore
 from .infrastructure.transactions import TransactionExecutor
@@ -127,6 +132,15 @@ def series_cover_policy(config: Configuration) -> SeriesCoverPolicy:
 
 @contextmanager
 def open_pipeline(config: Configuration, *, request: RunRequest | None = None) -> Iterator[Pipeline]:
+    roots = tuple(
+        [LibraryRoot(path, roles=("library",)) for path in config.paths]
+        + [LibraryRoot(path, roles=("download",)) for path in config.download_folders]
+    )
+    if request is not None and request.roots:
+        roots = request.roots
+    if not roots and request is not None and request.books and request.command != "recover":
+        roots = infer_book_roots(request.books)
+    validate_private_paths(tuple(root.path for root in roots), state_dir=config.state_dir, log_dir=config.log_dir)
     dictionaries = load_dictionaries(config.state_dir)
     parsing = parsing_policy(
         config, release_groups=tuple(regex.escape(value) for value in dictionaries.release_groups),
@@ -140,18 +154,12 @@ def open_pipeline(config: Configuration, *, request: RunRequest | None = None) -
         "extract_covers_toggle", "check_for_missing_volumes_toggle", "bookwalker_check",
         "auto_classify_watchdog_paths",
     )}
-    roots = tuple(
-        [LibraryRoot(path, roles=("library",)) for path in config.paths]
-        + [LibraryRoot(path, roles=("download",)) for path in config.download_folders]
-    )
-    if request is not None and request.roots:
-        roots = request.roots
     pipeline = Pipeline(
         roots=roots, state_dir=config.state_dir, max_stage_bytes=config.conversion_scratch_max_bytes,
         parsing=parsing, renaming=rename_policy(config, numbers=parsing.number_policy,
                                                publishers=dictionaries.publishers),
         archive=archive, covers=cover_policy(config, archive),
-        series_artwork=series_cover_policy(config), policy_version=config.policy_fingerprint(rule_version=3),
+        series_artwork=series_cover_policy(config), policy_version=config.policy_fingerprint(rule_version=4),
         classification=matching.classification, matching=matching, ranking=ranking_policy(config),
         options=options, unacceptable_keywords=config.unacceptable_keywords,
         ignored_folder_names=config.ignored_folder_names, log_dir=config.log_dir,

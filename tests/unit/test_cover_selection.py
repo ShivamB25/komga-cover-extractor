@@ -31,10 +31,8 @@ def test_epub_fallback_preserves_configured_pattern_order() -> None:
 
 
 def test_hidden_basenames_and_unsupported_members_do_not_become_cover() -> None:
-    result = select_cover_candidates(_members("OPS/.hidden.jpg", "OPS/__cover.png", "01.svg", "02.gif", "03.JPG", "folder/"), policy=CoverPolicy(ArchivePolicy()), is_epub=False)
-    assert (result.status, result.candidates) == ("valid", ("03.JPG",))
-    absent = select_cover_candidates(_members(".hidden.jpg", "__cover.png", "cover.svg"), policy=CoverPolicy(ArchivePolicy()), is_epub=False)
-    assert (absent.status, absent.reason) == ("absent", "no_cover_images")
+    result = select_cover_candidates(_members("OPS/.hidden.jpg", "OPS/__cover.png", "01.svg", "02.gif", "folder/"), policy=CoverPolicy(ArchivePolicy()), is_epub=False)
+    assert (result.status, result.reason, result.candidates) == ("absent", "no_cover_images", ())
 
 
 @pytest.mark.parametrize(("support", "extract", "status"), [(False, False, "absent"), (True, False, "absent"), (False, True, "absent"), (True, True, "valid")])

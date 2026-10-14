@@ -35,9 +35,14 @@ The executor's staged-byte budget uses the configured conversion scratch allowan
 
 Completed watch work and committed output artifacts retain exact-fingerprint, policy-scoped durable suppression. Restart does not republish unchanged completed books. Uncommitted waiting/ready observations restart their quiet window; old persisted readiness is not mutation authority. Completed peers reused as decision evidence are freshly sampled and checked against current fingerprints and downloader state.
 
-Growing or unfinished peers cannot authorize duplicate retirement. Sidecar and folder effects defer until their actual sources are ready, as do real multipart dependencies. Dependency waits do not consume archive-decoder retry attempts. Other decoder failures retain bounded retries. Active jobs, auxiliary samples, and readiness caches remain bounded; a mutation footprint that exceeds configured readiness capacity stays deferred rather than expanding authority or silently dropping participants.
+Growing or unfinished peers cannot authorize duplicate retirement. Sidecar and folder effects defer until their actual sources are ready, as do real multipart dependencies. Dependency waits do not consume archive-decoder retry attempts. Other decoder failures retain bounded retries. Active jobs, auxiliary samples, and readiness caches remain bounded; evicted multipart associations are freshly observed before dispatch. A multipart snapshot exceeding the configured dependency capacity remains intact for explicit review, not an endless wait or expanded authority.
 
 SIGINT/SIGTERM interrupts pending terminal approvals without requiring input and leaves uncommitted candidates intact. Retained originals, committed groups, and independent delivery obligations keep their existing recovery contracts.
+
+## Unsent torrent actions
+
+Producer-confirmed local failures before a mutation was dispatched remain retryable. A fresh authorized attempt re-observes torrent/files, server version, policy, library evidence, and cancellation before sending an effect. Historical failed rows with a validated known-unsent error use an atomic claim over the exact previous payload and error; a competing claimant cannot be overwritten. `pending_unknown = false` alone is insufficient because received HTTP rejections also use it. Sent rejections and ambiguous outcomes retain their existing non-replay/reconciliation behavior. Torrent removal still requires separate permission and always requests `deleteFiles=false`.
+
 
 ## Tested and residual limits
 

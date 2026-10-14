@@ -169,3 +169,40 @@ def test_toml_input_is_bounded(tmp_path: Path) -> None:
     config_file.write_bytes(b"#" * (1024 * 1024 + 1))
     with pytest.raises(ConfigurationError, match="1 MiB"):
         load_config(config_file, environ={})
+
+
+@pytest.mark.parametrize("private_key", ["state_dir", "log_dir"])
+@pytest.mark.parametrize("media_key", ["paths", "download_folders"])
+@pytest.mark.parametrize("relation", ["equal", "ancestor"])
+def test_private_directories_cannot_exclude_a_configured_media_root(
+    tmp_path: Path, private_key: str, media_key: str, relation: str,
+) -> None:
+    media = tmp_path / "private" / "media"
+    private = media if relation == "equal" else media.parent
+    marker = tmp_path / "keep.txt"
+    marker.write_bytes(b"Configuration validation must not change this file.")
+    values: dict[str, object] = {
+        media_key: [str(media)], "state_dir": str(tmp_path / "state"),
+        "log_dir": str(tmp_path / "logs"), private_key: str(private),
+    }
+    with pytest.raises(ConfigurationError, match=private_key + " must not equal or contain a media root"):
+        validate_config(values, base_dir=tmp_path)
+    assert set(tmp_path.iterdir()) == {marker}
+    assert marker.read_bytes() == b"Configuration validation must not change this file."
+
+
+@pytest.mark.parametrize("layout", ["children", "unrelated", "prefix_neighbors"])
+def test_private_directories_allow_child_exclusions_and_unrelated_paths(tmp_path: Path, layout: str) -> None:
+    media = tmp_path / "media"
+    if layout == "children":
+        state, logs = media / "state", media / "logs"
+    elif layout == "unrelated":
+        state, logs = tmp_path / "state", tmp_path / "logs"
+    else:
+        state, logs = tmp_path / "media-old", tmp_path / "media-logs"
+    config = validate_config({
+        "paths": [str(media)], "state_dir": str(state), "log_dir": str(logs),
+    }, base_dir=tmp_path)
+    assert config.paths == (media,)
+    assert (config.state_dir, config.log_dir) == (state, logs)
+    assert tuple(tmp_path.iterdir()) == ()

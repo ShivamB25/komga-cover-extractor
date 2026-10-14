@@ -745,3 +745,26 @@ def test_state_preparation_release_failure_does_not_report_success_or_retain_loc
         authorization=RunAuthorization(apply=True),
     )
     assert (prepared.status, prepared.reason) == ("observed", "state_root_prepared")
+
+
+def test_failed_error_retry_has_one_owner_and_requires_the_exact_previous_intent(tmp_path: Path) -> None:
+    state = StateStore(tmp_path / "state")
+    state.initialize()
+    payload = {"torrent": "observed-generation", "action": "start"}
+    state.put_job("unsent", "qbit_action", payload, state="failed", error="http_worker_failed")
+    prior = state.get_job("unsent")
+    assert not state.claim_job("unsent", "qbit_action", payload)
+    assert not state.claim_job("unsent", "delivery", payload, retry_failed_error="http_worker_failed")
+    assert not state.claim_job("unsent", "qbit_action", {"action": "remove"}, retry_failed_error="http_worker_failed")
+    assert not state.claim_job("unsent", "qbit_action", payload, retry_failed_error="http_403")
+    assert state.get_job("unsent") == prior
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        claims = tuple(pool.map(
+            lambda _: state.claim_job("unsent", "qbit_action", payload, retry_failed_error="http_worker_failed"),
+            range(4),
+        ))
+    assert sorted(claims) == [False, False, False, True]
+    claimed = state.get_job("unsent")
+    assert claimed is not None and claimed.state == "running" and claimed.error is None
+    assert claimed.payload == payload
+    assert not state.claim_job("unsent", "qbit_action", payload, retry_failed_error="http_worker_failed")

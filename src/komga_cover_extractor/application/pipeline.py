@@ -16,7 +16,13 @@ import regex
 from ..covers.selection import CoverPolicy
 from ..covers.series_policy import SeriesCoverPolicy
 from ..domain.decisions import Decision, RunAuthorization, RunResult, Status
-from ..domain.libraries import LibraryRoot, LibrarySnapshot, normalize_library_roots
+from ..domain.libraries import (
+    LibraryRoot,
+    LibrarySnapshot,
+    infer_book_roots,
+    normalize_library_roots,
+    validate_private_paths,
+)
 from ..domain.operations import (
     ArtifactSpec,
     FileFingerprint,
@@ -163,6 +169,19 @@ class Pipeline:
         self.roots = normalize_library_roots(roots)
 
     def run(self, request: RunRequest) -> RunResult:
+        try:
+            roots = normalize_library_roots(request.roots or self.roots)
+            if not roots and request.books and request.command != "recover":
+                roots = infer_book_roots(request.books)
+        except (ValueError, TypeError):
+            return RunResult((Decision("invalid_input", "invalid_selected_roots"),))
+        try:
+            validate_private_paths(
+                tuple(root.path for root in roots), state_dir=self.state_dir, log_dir=self.log_dir,
+            )
+        except ValueError as error:
+            return RunResult((Decision("invalid_input", "private_directory_contains_media_root",
+                                      candidates=(str(error),)),))
         if request.command == "recover":
             return self._recover(request)
         if any(decision.status != "observed" for decision in self.dictionary_diagnostics):
@@ -172,12 +191,6 @@ class Pipeline:
         if request.command not in {"inspect", "extract", "convert", "organize", "duplicates", "run",
                                    "missing-releases", "rename-lists", "releases"}:
             return RunResult((Decision("unsupported", "unknown_command"),))
-        try:
-            roots = normalize_library_roots(request.roots or self.roots)
-            if not roots and request.books:
-                roots = normalize_library_roots(tuple(LibraryRoot(path.absolute().parent) for path in request.books))
-        except (ValueError, TypeError):
-            return RunResult((Decision("invalid_input", "invalid_selected_roots"),))
         if not roots:
             return RunResult((Decision("invalid_input", "no_selected_roots"),))
         files, directories, decisions, unavailable = self._inventory(roots)

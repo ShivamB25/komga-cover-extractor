@@ -141,6 +141,32 @@ def normalize_library_roots(roots: tuple[LibraryRoot, ...]) -> tuple[LibraryRoot
     return result
 
 
+def infer_book_roots(books: tuple[Path, ...]) -> tuple[LibraryRoot, ...]:
+    """Keep only the outermost selected book parents, without resolving links."""
+    parents = sorted({_absolute_lexical(book).parent for book in books})
+    roots: list[LibraryRoot] = []
+    for path in parents:
+        if not any(path.is_relative_to(root.path) for root in roots):
+            roots.append(LibraryRoot(path))
+    return tuple(roots)
+
+
+def validate_private_paths(
+    media_roots: tuple[Path, ...], *, state_dir: Path, log_dir: Path | None = None,
+) -> None:
+    """Private exclusions may be below media roots, never cover a whole root."""
+    roots = tuple(_absolute_lexical(root) for root in media_roots)
+    for name, path in (("state_dir", state_dir), ("log_dir", log_dir)):
+        if path is None:
+            continue
+        private = _absolute_lexical(path)
+        if any(root.is_relative_to(private) for root in roots):
+            raise ValueError(
+                f"{name} must not equal or contain a media root; "
+                "choose a private subdirectory or an unrelated directory"
+            )
+
+
 def normalize_path_mappings(mappings: tuple[PathMapping, ...]) -> tuple[PathMapping, ...]:
     """Reject duplicate local roots unless their remote destinations agree."""
     if not isinstance(mappings, tuple) or any(not isinstance(item, PathMapping) for item in mappings):

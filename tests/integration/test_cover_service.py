@@ -438,3 +438,36 @@ def test_epub_authority_ignores_unselected_hidden_raw_first_raster(
     )
     assert fingerprint(book, tmp_path) == source
     assert _manifest(tmp_path) == before
+
+
+def test_comic_discovery_preserves_case_sensitive_extensions(tmp_path: Path) -> None:
+    lowercase = _raster("blue")
+    book = _archive(tmp_path / "Series v01.cbz", (("000.PNG", _raster("red")), ("001.png", lowercase)))
+    before = _manifest(tmp_path)
+    result = extract_cover(book, root=tmp_path, policy=CoverPolicy(ArchivePolicy()), output=FileOutputPolicy())
+    assert (result.status, result.selected_member) == ("valid", "001.png")
+    assert result.artifact is not None and result.artifact.content == lowercase
+    assert _manifest(tmp_path) == before
+
+
+def test_uppercase_only_comic_has_no_cover_without_mutating_the_archive(tmp_path: Path) -> None:
+    book = _archive(tmp_path / "Series v01.cbz", (("000.PNG", _raster("red")),))
+    before = _manifest(tmp_path)
+    result = extract_cover(book, root=tmp_path, policy=CoverPolicy(ArchivePolicy()), output=FileOutputPolicy())
+    assert (result.status, result.reason) == ("absent", "no_cover_images")
+    assert result.artifact is None and result.data is None
+    assert _manifest(tmp_path) == before
+
+
+def test_authoritative_epub_cover_can_have_an_uppercase_extension(tmp_path: Path) -> None:
+    book = _epub(tmp_path / "Novel v01.epub", cover_href="images/Front%20Cover.JPG")
+    with zipfile.ZipFile(book, "a") as archive:
+        archive.writestr("OPS/images/Front Cover.JPG", _raster("red", image_format="JPEG"))
+    before = _manifest(tmp_path)
+    result = extract_cover(book, root=tmp_path, policy=CoverPolicy(ArchivePolicy()), output=FileOutputPolicy())
+    assert (result.status, result.selected_member) == ("valid", "OPS/images/Front Cover.JPG")
+    assert result.artifact is not None and result.artifact.content is not None
+    with Image.open(BytesIO(result.artifact.content)) as image:
+        red, green, blue = image.convert("RGB").getpixel((8, 8))
+        assert red > 240 and green < 12 and blue < 12
+    assert _manifest(tmp_path) == before

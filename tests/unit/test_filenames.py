@@ -293,6 +293,8 @@ def test_extra_range_roundtrip_keeps_the_marker_on_its_ordered_endpoint(
     reparsed = parse_release(observation(first, root_role="library"), parsing_policy)
 
     assert first == rendered
+    assert (release.display_series, reparsed.display_series) == ("Series", "Series")
+    assert (release.canonical_series_key, reparsed.canonical_series_key) == ("serie", "serie")
     for snapshot in (release, reparsed):
         assert snapshot.kind == "volume"
         assert snapshot.number.kind == "range"

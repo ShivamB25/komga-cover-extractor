@@ -19,6 +19,8 @@ KCE_KOMGA_PATH_MAPPINGS='[{local_root="/books", remote_root="/library"}]' kce in
 
 `state_dir` defaults to `$XDG_STATE_HOME/komga-cover-extractor`, or `~/.local/state/komga-cover-extractor`; `log_dir` defaults to `logs` under the selected state directory. They are scalar paths. Merely loading configuration never creates either directory. Empty root/path strings are rejected rather than interpreted as the current directory.
 
+Neither private directory may equal or contain a configured or effectively selected media root. Invalid containment is rejected before logging, journal creation, or watch startup; private child directories inside a media root remain excluded from inventory.
+
 Policy is instance-owned: ordered volume/chapter/exclusion/subtitle regexes, cover patterns, classification records, padding widths, ranking and matching thresholds, series artwork roles, archive budgets, transport timeouts, and watch queue/readiness settings use the same inputs. Regexes retain the `regex` engine and order. Empty optional lists disable their corresponding rules, except an empty `exception_keywords` list conservatively protects all chapters from explicit chapter deletion, preserving the historical empty-regex outcome. A library-type record has exactly `name`, `extensions`, `must_contain`, `must_not_contain`, and `match_percentage`. Existing defaults are retained rather than replaced with new heuristics.
 
 Ratios are bounded to [0,1], percentages to [0,100], counts and widths are positive integers, and archive expansion ratio is a positive finite number. File image quality and return-data quality are independent (40 and 60 respectively); both accept 1–100. Protocol/format support is not configurable: changing a limit does not enable an unsupported decoder. An enabled dormant `move_new_series_to_library_toggle` is rejected as `unsupported_policy`.
@@ -29,7 +31,13 @@ Ratios are bounded to [0,1], percentages to [0,100], counts and widths are posit
 
 Organizer matching never treats a download-role root, including a dual-role root, as existing-library evidence. A root-level incoming book is not eligible for library matching until grouping actually projects it into a non-root folder. `ignored_folder_names` applies to complete literal parent-path components, including configured root names and ancestors.
 
+Read-only release checks include dual-role library/download roots; only download-only observations are excluded. When explicit books supply roots without configured paths, nested inferred parents collapse to the outermost selected parent while disjoint roots remain separate. Explicitly configured nested roots still fail validation.
+
+`move_lone_files_to_similar_folder` and `replace_series_name_in_file_name_with_similar_folder_name` modify grouping under `create_folders_for_items_in_download_folder_toggle`; they do not independently enable an organizer pass.
+
 `convert_to_cbz_toggle` owns ordinary ZIP-to-CBZ naming through `rename_zip_to_cbz`, independently of `correct_file_extensions_toggle`. Full `run` preprocessing is download-only; focused `convert` retains explicit library selection. Available native member timestamps preserve local civil time with ZIP's two-second precision and 1980–2107 bounds.
+
+`watch_max_pending_jobs` also bounds tracked multipart dependencies. An archive with more secondary parts than this bound returns `review_required` with `watch_archive_parts_limit`, without retiring any source. Increase the bound or use focused conversion; the watcher does not manufacture readiness or wait indefinitely for an impossible snapshot.
 
 ## Safe legacy migration
 

@@ -720,7 +720,12 @@ def _configured_request(
     from .application.serve import child_roots
     from .compat.legacy_cli import parse_docker_environment
     from .domain.decisions import RunAuthorization
-    from .domain.libraries import LibraryRoot, normalize_library_roots
+    from .domain.libraries import (
+        LibraryRoot,
+        infer_book_roots,
+        normalize_library_roots,
+        validate_private_paths,
+    )
 
     environment = dict(os.environ)
     try:
@@ -772,9 +777,15 @@ def _configured_request(
     try:
         selected_roots = normalize_library_roots(tuple(roots))
         if not selected_roots and books:
-            selected_roots = normalize_library_roots(tuple(LibraryRoot(book.absolute().parent) for book in books))
+            selected_roots = infer_book_roots(books)
     except ValueError:
         raise _CliValidationError("conflicting_or_nested_roots") from None
+    try:
+        validate_private_paths(
+            tuple(root.path for root in selected_roots), state_dir=config.state_dir, log_dir=config.log_dir,
+        )
+    except ValueError as error:
+        raise _CliValidationError(str(error)) from None
     if legacy is not None:
         command = "qbit" if namespace.command == "legacy-qbit" else "watch" if config.watchdog_toggle else "run"
         authorization = legacy.authorization
