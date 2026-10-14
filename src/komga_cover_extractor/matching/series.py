@@ -27,7 +27,7 @@ from komga_cover_extractor.parsing.normalization import clean_str, parse_words, 
 
 MATCH_CACHE_MAX_ENTRIES = 4096
 MATCH_CACHE_TTL_SECONDS = 300.0
-MATCH_RULE_VERSION = "series-v2"
+MATCH_RULE_VERSION = "series-v3"
 
 MatchStatus = Literal[
     "matched", "no_match", "ambiguous", "missing_dependency", "invalid_input"
@@ -377,22 +377,6 @@ def _name_similarity(
     if cache is not None and key is not None and now is not None:
         cache._put(key, score, policy, now)
     return score
-
-
-def _candidate_keys(candidate: MatchCandidate) -> frozenset[str]:
-    keys = {clean_str(candidate.series_path.name).casefold().strip()}
-    keys.update(
-        release.canonical_series_key.casefold().strip()
-        for release in candidate.releases
-        if release.canonical_series_key.strip()
-    )
-    keys.update(
-        clean_str(release.display_series).casefold().strip()
-        for release in candidate.releases
-        if clean_str(release.display_series)
-    )
-    keys.discard("")
-    return frozenset(keys)
 
 
 def _release_identifiers(release: ReleaseSnapshot) -> frozenset[tuple[str, str]]:
@@ -941,7 +925,7 @@ def match_series(
             item.series_path, item.root, item.releases, 1.0, "prioritized_name"
         )
         for item in all_candidates
-        if incoming_key and incoming_key in _candidate_keys(item)
+        if incoming_key and incoming_key == clean_str(item.series_path.name).casefold().strip()
     )
     if prioritized:
         return _decision_for_tier(prioritized, "prioritized_name_match")

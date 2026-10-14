@@ -152,6 +152,7 @@ def plan_torrent(
         return (Decision("missing_dependency", problem, candidates=(torrent_hash,)),)
     if not files:
         return (Decision("missing_dependency", "qbit_file_metadata_unavailable", candidates=(torrent_hash,)),)
+    matching = replace(matching, match_through_image_similarity=False, match_through_identifiers=False)
     patterns = _unacceptable_patterns(cast(tuple[str, ...], options.get("unacceptable_keywords", ())))
     filter_unacceptable = bool(options.get("delete_unacceptable_files_toggle", False))
     title_excluded = filter_unacceptable and bool(options.get("delete_unacceptable_torrent_titles_in_qbit", False)) and any(
@@ -161,23 +162,22 @@ def plan_torrent(
     excluded: set[int] = set()
     for file in files:
         index = cast(int, file["index"])
-        if file["priority"] == 0:
-            excluded.add(index)
-            decisions.append(_decision(torrent, file, "skipped", "qbit_already_excluded"))
-            continue
         basename = PurePosixPath(str(file["name"])).name
         if title_excluded or filter_unacceptable and any(pattern.search(basename) for pattern in patterns):
             excluded.add(index)
-            decisions.append(_decision(torrent, file, "planned", "qbit_exclude_unacceptable_title" if title_excluded else "qbit_exclude_unacceptable_basename"))
+            decisions.append(_decision(torrent, file, "skipped" if file["priority"] == 0 else "planned",
+                                       "qbit_exclude_unacceptable_title" if title_excluded else "qbit_exclude_unacceptable_basename"))
             continue
         if PurePosixPath(basename).suffix.casefold() not in _BOOK_EXTENSIONS | _CONVERTIBLE_EXTENSIONS:
             decisions.append(_decision(torrent, file, "observed", "qbit_keep_auxiliary_file"))
             continue
         incoming = _incoming_release(torrent, file, parsing)
         status, reason = _release_choice(incoming, library, matching, ranking)
-        decisions.append(_decision(torrent, file, status, reason))
         if status == "planned":
             excluded.add(index)
+            if file["priority"] == 0:
+                status = "skipped"
+        decisions.append(_decision(torrent, file, status, reason))
     if any(decision.status not in {"observed", "planned", "skipped"} for decision in decisions):
         return tuple(replace(decision, status="skipped", reason="qbit_torrent_undecided")
                      if decision.status == "planned" else decision for decision in decisions)

@@ -268,6 +268,128 @@ def committed_notice(tmp_path: Path) -> tuple[StateStore, tuple[LibraryRoot, ...
     return state, (LibraryRoot(library),), original, replace(result, releases=(published,))
 
 
+def test_bootstrap_commit_callback_sends_package_version_on_actual_discord_payloads(
+    tmp_path: Path, wire: WireServer,
+) -> None:
+    from komga_cover_extractor import __version__
+    from komga_cover_extractor.application.pipeline import RunRequest
+    from komga_cover_extractor.bootstrap import open_pipeline
+    from komga_cover_extractor.config import validate_config
+
+    library, downloads = tmp_path / "library", tmp_path / "downloads"
+    existing, source = library / "Series" / "Series v01.cbz", downloads / "Series" / "Series v02.cbz"
+    for path in (existing, source):
+        path.parent.mkdir(parents=True)
+        with ZipFile(path, "w") as archive:
+            archive.writestr("01.png", _image_bytes("PNG", "red"))
+            archive.writestr("cover.png", _image_bytes("PNG", "blue"))
+    original = source.read_bytes()
+    config = validate_config({
+        "paths": [str(library)], "download_folders": [str(downloads)],
+        "state_dir": str(tmp_path / "state"), "log_dir": str(tmp_path / "logs"),
+        "manual_rename": False, "manual_delete": False, "log_to_file": False,
+        "generate_release_group_list_toggle": False, "extract_covers_toggle": False,
+        "compare_detected_cover_to_blank_images": False, "output_covers_as_webp": True,
+        "match_through_image_similarity": False, "bookwalker_check": False,
+        "check_for_existing_series_toggle": True,
+        "send_scan_request_to_komga_libraries_toggle": False,
+        "discord_webhook_url": [wire.url("/api/webhooks/1/fixture-normal")],
+        "new_volume_webhook": wire.url("/api/webhooks/2/fixture-new-release"),
+    }, base_dir=tmp_path)
+    wire.reply(body=b'{"id":"123"}')
+    wire.reply(body=b'{"id":"124"}')
+    request = RunRequest("organize", authorization=RunAuthorization(apply=True, allow_remote=True))
+    with open_pipeline(config) as pipeline:
+        result = pipeline.run(request)
+        repeated = pipeline.run(request)
+    assert (result.committed, result.failed, result.deferred_deliveries, result.exit_code) == (1, 0, (), 0)
+    assert (repeated.committed, repeated.failed, repeated.deferred_deliveries, repeated.exit_code) == (0, 0, (), 0)
+    assert sorted((call.method, call.target) for call in wire.calls) == [
+        ("POST", "/api/webhooks/1/fixture-normal?wait=true"),
+        ("POST", "/api/webhooks/2/fixture-new-release?wait=true"),
+    ]
+    by_target = {call.target: call for call in wire.calls}
+    normal = json.loads(by_target["/api/webhooks/1/fixture-normal?wait=true"].body)
+    added = _multipart(by_target["/api/webhooks/2/fixture-new-release?wait=true"])["payload_json"]
+    embeds = [*normal["embeds"], *added["embeds"]]
+    assert [embed["title"] for embed in embeds] == [
+        "Found Series Match", "Moved File", "Moved Folder", "New Volume(s) Added",
+    ]
+    assert [embed["footer"] for embed in embeds] == [{"text": f"v{__version__}"}] * 4
+    assert added["embeds"][0]["fields"] == [
+        {"name": "Volume Number(s)", "value": "```2```", "inline": False},
+        {"name": "Volume Name(s)", "value": "```Series v02.cbz```", "inline": False},
+    ]
+    assert (library / "Series" / "Series v02.cbz").read_bytes() == original
+    assert not source.exists()
+
+
+def test_bootstrap_release_callback_sends_package_version_without_a_formatter_stub(
+    tmp_path: Path, wire: WireServer, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from komga_cover_extractor import __version__
+    from komga_cover_extractor.application.pipeline import RunRequest
+    from komga_cover_extractor.bootstrap import open_pipeline
+    from komga_cover_extractor.config import validate_config
+    from komga_cover_extractor.integrations import bookwalker
+
+    library = tmp_path / "library"
+    source = library / "Series" / "Series v01.cbz"
+    source.parent.mkdir(parents=True)
+    with ZipFile(source, "w") as archive:
+        archive.writestr("01.png", _image_bytes("PNG", "red"))
+    original = source.read_bytes()
+    config = validate_config({
+        "paths": [str(library)], "state_dir": str(tmp_path / "state"),
+        "log_dir": str(tmp_path / "logs"), "log_to_file": False,
+        "bookwalker_check": True, "bookwalker_request_interval_seconds": 1,
+        "bookwalker_webhook_urls": [wire.url("/api/webhooks/3/fixture-released"),
+                                   wire.url("/api/webhooks/4/fixture-preorder")],
+        "send_scan_request_to_komga_libraries_toggle": False,
+    }, base_dir=tmp_path)
+    monkeypatch.setattr(bookwalker, "BOOKWALKER_ORIGIN", wire.url("/store/"))
+    series = b"<ul class='o-tile-list'><li class='o-tile'></li></ul>"
+    products = (
+        b"<ul class='o-tile-list'><li class='o-tile'><div class='o-tile-book-info'>"
+        b"<a class='a-tile-thumb-img' href='https://global.bookwalker.jp/book-2/'></a>"
+        b"<div class='a-tag-manga'>Manga</div><h2 class='a-tile-ttl'>Series Volume 2</h2>"
+        b"</div></li></ul>"
+    )
+    detail = (
+        b"<div class='product-detail-inner'><table class='product-detail'>"
+        b"<tr><th>Series Title</th><td>Series</td></tr>"
+        b"<tr><th>Release Date</th><td>October 13, 2020</td></tr></table></div>"
+    )
+    for body in (series, products, detail):
+        wire.reply(body=body, headers=(("Content-Type", "text/html; charset=utf-8"),))
+    wire.reply(body=b'{"id":"125"}')
+    for body in (series, products, detail):
+        wire.reply(body=body, headers=(("Content-Type", "text/html; charset=utf-8"),))
+    request = RunRequest("releases", authorization=RunAuthorization(allow_remote=True))
+    with open_pipeline(config) as pipeline:
+        result = pipeline.run(request)
+        repeated = pipeline.run(request)
+    assert (result.committed, result.failed, result.deferred_deliveries, result.exit_code) == (0, 0, (), 0)
+    assert (repeated.committed, repeated.failed, repeated.deferred_deliveries, repeated.exit_code) == (0, 0, (), 0)
+    assert [(call.method, call.target) for call in wire.calls] == [
+        ("GET", "/store/search/?word=Series&np=0"),
+        ("GET", "/store/search/?word=Series&page=1&qcat=2"),
+        ("GET", "/store/book-2/"),
+        ("POST", "/api/webhooks/3/fixture-released?wait=true"),
+        ("GET", "/store/search/?word=Series&np=0"),
+        ("GET", "/store/search/?word=Series&page=1&qcat=2"),
+        ("GET", "/store/book-2/"),
+    ]
+    payload = json.loads(wire.calls[3].body)
+    embed, = payload["embeds"]
+    assert (embed["title"], embed["footer"], embed["fields"]) == (
+        "Series Volume 2", {"text": f"v{__version__}"},
+        [{"name": "Type", "value": "manga", "inline": False},
+         {"name": "Release Date", "value": "2020-10-13", "inline": False}],
+    )
+    assert source.read_bytes() == original
+
+
 def test_request_preserves_prefix_and_explicit_auth_without_proxy_or_netrc_bleed(
     wire: WireServer, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:

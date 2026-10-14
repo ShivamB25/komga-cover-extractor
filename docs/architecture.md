@@ -17,7 +17,9 @@ flowchart TD
 
 ## Values and identity
 
-`ReleaseNumber` distinguishes missing, scalar, contiguous range and explicit set. Decimal values come from source tokens rather than binary floats; raw tokens preserve presentation precision. Part is separate from the release number, so part 12 cannot alias volume + 1.2. Expansion is bounded and semantic comparison is explicit, not dataclass ordering across incompatible number kinds.
+`ReleaseNumber` distinguishes missing, scalar, contiguous range and explicit set. Decimal values come from source tokens rather than binary floats; raw tokens preserve presentation precision. Part is separate from the release number, so part 12 cannot alias volume + 1.2. Originally accepted zero and fractional chapter parts remain valid; integer parts serialize as integers and fractional parts as exact decimal strings. Renaming retains the original source-span grammar: an unrecognized fractional `x` span is left unchanged, not partially rewritten. Expansion is bounded and semantic comparison is explicit, not dataclass ordering across incompatible number kinds.
+
+Renaming keeps `_extra` attached to its original range endpoint while ordering the range. A descending `v3-1_extra` renders as `v01_extra-03`; reparsing preserves coverage and part identity.
 
 `FileObservation` supplies siblings, root role, metadata, page/grayscale observations and optional fingerprint. `ReleaseSnapshot` is frozen but uses identity equality, preserving the original distinction between two separately observed files. Path, content and semantic deduplication use explicit keys. Name, stem and parent derive from the observed path rather than independently mutable fields.
 
@@ -40,7 +42,7 @@ Configuration and value contracts have unit and real CLI checks. Publication tes
 
 `extract_cover` performs archive and raster work in the owned archive worker. `CoverPolicy` contains the effective selection, chapter, blank-filter, and encoding settings. `ByteOutputPolicy` and `FileOutputPolicy` select output modes. Neither mode publishes a sidecar.
 
-Comic discovery retains full-path lexical ordering. EPUB discovery uses the exact authoritative member returned by the package resolver. Non-authoritative fallback retains regex order and the original pattern-pass behavior after a blank match.
+Comic discovery sorts validated raw archive-member names; reads still use safe canonical paths. EPUB discovery uses the exact authoritative member returned by the package resolver; unrelated raw first-page images are not decoded during inspection or extraction. Only positive blank detection permits ordered fallback after valid authority; missing, unsafe, ambiguous, or invalid authority never falls back. Non-authoritative discovery retains regex order and the original pattern-pass behavior after a blank match.
 
 File mode preserves correctly labeled JPEG and PNG bytes when no transformation is requested. `.jpeg` output normalizes to `.jpg`. Requested WebP always transcodes, including when compression is off. A WebP source requested as ordinary file artwork becomes JPEG. File re-encoding uses `image_quality` and optimization. Byte mode always re-encodes with `return_data_image_quality`, without optimization, and returns the actual codec identity.
 
@@ -48,8 +50,27 @@ Transformed JPEG composites transparency onto white. Transformed rasters apply E
 
 `compare_cover_bytes` supervises matching input through the same worker. The worker retains the characterized OpenCV 400-by-600 `INTER_AREA`, channel reconciliation, grayscale, histogram equalization, normalization, and SSIM pipeline. Missing comparison extras or packaged blank references are capability failures.
 
-`plan_series_artwork` consumes `SeriesArtworkObservation` rather than scanning directories. First and latest selection retain exact part and collection membership. Chapter copying requires one explicit matched or mapped volume series and a qualifying volume-one source. Mixed-series folders require review. Subfolders and configured download-root placement prevent series-art creation.
+`plan_series_artwork` consumes `SeriesArtworkObservation` rather than scanning directories. First and latest selection retain exact part and collection membership, including a unique qualifying one-shot. Chapter copying uses configured matching thresholds, requires one explicit matched or mapped library/both-role volume series and a qualifying volume-one source, and checks both chapter gates before copying or extraction. Download-only volume folders are not standalone chapter-art sources. Archive-observed classification survives folder reconstruction; filename-only assessments cannot bypass current page-count classification. Mixed-series folders require review. Subfolders and configured download-root placement prevent series-art creation.
 
 Artwork equality uses observed SHA-256, even when timestamps match. Custom cover and poster artwork remains untouched unless its bytes are already identical. Recorded generated artwork can be updated. Cross-extension decisions retain old artwork and name cleanup only after the replacement commits. New series artwork uses the legacy cover-only creation default. Existing recorded poster roles remain associated and can update with their owning book.
 
 `check_book_artwork_collisions` detects archives sharing a sidecar stem before publication. Artwork decisions identify the source book, source image, destination, retained candidates, and post-commit cleanup. The pipeline converts these decisions into grouped executor operations.
+
+## Readiness and bounded work
+
+Watch requests carry exact ready source fingerprints, not path-only authority. Unready downloads remain in physical catalogs for collision checks but cannot become ranked keepers or mutation sources. Compiled plans fence original sources, replaced destinations, and original artifact inputs, including recorded series artwork; fresh owned workspace artifacts are not mistaken for downloads. Sidecar, folder, and multipart effects require every actual participant; unrelated ready books need not wait for a whole connected series. Native archive readers identify real multipart dependencies, and associated files receive bounded quiet sampling without consuming one active pipeline job per part.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Waiting
+    Waiting --> Ready: Quiet samples and current source evidence
+    Ready --> Running: Affected participants are ready
+    Ready --> Waiting: Sidecar or archive part still transferring
+    Running --> Complete: Verified commit or genuine no-op
+    Running --> Waiting: Mutation scope deferred
+    Complete --> Waiting: Changed source or policy
+```
+
+Readiness precedes dispatch. Incomplete or nonprimary multipart observations wait for their primary instead of spending decoder retries. Completed publication is durably deduplicated by exact fingerprints; restoring uncommitted observations requires fresh sampling. Hidden owned workspaces are excluded before directory reconciliation. Interactive approvals use one cancellation-aware, bounded line reader.
+
+Each decoder still has an owned supervisor. A run-local header observation is reused between correction and conversion. With no organizer action enabled, cover-only `run` omits an unused post-artwork organizer pass; it retains bounded artifact spilling, fingerprint checks, staging, fsync, and journal recovery.

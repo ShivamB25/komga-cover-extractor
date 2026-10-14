@@ -11,6 +11,7 @@ import zipfile
 import zlib
 from collections.abc import Buffer, Mapping
 from dataclasses import dataclass, fields
+from datetime import datetime
 from pathlib import Path
 from types import TracebackType
 from typing import IO, BinaryIO, Protocol, Self, cast
@@ -82,6 +83,32 @@ class ArchiveMember:
     compressed_size: int
     is_dir: bool
     raw_name: str
+    modified_at: tuple[int, int, int, int, int, int] | None = None
+
+
+def zip_member_timestamp(value: object) -> tuple[int, int, int, int, int, int] | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        if value.year < 1979:
+            return (1980, 1, 1, 0, 0, 0)
+        if value.year > 2108:
+            return (2107, 12, 31, 23, 59, 58)
+        # ZIP stores local civil time, as the legacy filesystem round trip did.
+        observed = value.astimezone() if value.tzinfo is not None else value
+    else:
+        if not isinstance(value, tuple) or len(value) != 6 or any(type(part) is not int for part in value):
+            raise ArchiveError('invalid_archive_timestamp')
+        try:
+            observed = datetime(*value)
+        except (ValueError, OverflowError):
+            raise ArchiveError('invalid_archive_timestamp') from None
+    if observed.year < 1980:
+        return (1980, 1, 1, 0, 0, 0)
+    if observed.year > 2107:
+        return (2107, 12, 31, 23, 59, 58)
+    return (observed.year, observed.month, observed.day, observed.hour, observed.minute,
+            observed.second - observed.second % 2)
 
 
 class ArchiveSource(Protocol):
@@ -235,7 +262,7 @@ class ArchiveReader:
                 raise ArchiveError('archive_expansion_limit')
             self._entries[canonical] = info
             members.append(ArchiveMember(canonical, info.file_size, info.compress_size,
-                                         info.is_dir(), raw_name))
+                                         info.is_dir(), raw_name, zip_member_timestamp(info.date_time)))
         files = {member.name for member in members if not member.is_dir}
         for member in members:
             components = member.name.split('/')

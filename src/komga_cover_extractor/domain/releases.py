@@ -68,7 +68,7 @@ class ReleaseNumber:
     kind: ReleaseNumberKind
     values: tuple[Decimal, ...] = ()
     raw_tokens: tuple[str, ...] = ()
-    part: int | None = None
+    part: int | Decimal | None = None
 
     def __post_init__(self) -> None:
         if self.kind not in _NUMBER_KINDS:
@@ -80,9 +80,11 @@ class ReleaseNumber:
         object.__setattr__(self, "raw_tokens", raw_tokens)
 
         if self.part is not None and (
-            isinstance(self.part, bool) or not isinstance(self.part, int) or self.part < 1
+            isinstance(self.part, bool) or not isinstance(self.part, (int, Decimal))
+            or isinstance(self.part, Decimal) and not self.part.is_finite()
+            or self.part < 0
         ):
-            raise ValueError("part must be a positive integer or None")
+            raise ValueError("part must be a finite nonnegative integer or Decimal, or None")
         if any(not isinstance(value, Decimal) for value in values):
             raise TypeError("release number values must be Decimal instances")
         if any(not isinstance(token, str) for token in raw_tokens):
@@ -111,7 +113,7 @@ class ReleaseNumber:
             raise ValueError("a set release number must contain at least one member")
 
     @classmethod
-    def missing(cls, *, part: int | None = None) -> ReleaseNumber:
+    def missing(cls, *, part: int | Decimal | None = None) -> ReleaseNumber:
         """Create a missing number while retaining an independently known part."""
 
         return cls(kind="missing", part=part)
@@ -122,7 +124,7 @@ class ReleaseNumber:
         kind: ReleaseNumberKind,
         raw_tokens: Sequence[str],
         *,
-        part: int | None = None,
+        part: int | Decimal | None = None,
     ) -> ReleaseNumber:
         """Construct exact Decimal values directly from source tokens."""
 
@@ -133,18 +135,18 @@ class ReleaseNumber:
         return cls(kind=kind, values=values, raw_tokens=tokens, part=part)
 
     @classmethod
-    def scalar(cls, token: str, *, part: int | None = None) -> ReleaseNumber:
+    def scalar(cls, token: str, *, part: int | Decimal | None = None) -> ReleaseNumber:
         return cls.from_tokens("scalar", (token,), part=part)
 
     @classmethod
     def range(
-        cls, start: str, end: str, *, part: int | None = None
+        cls, start: str, end: str, *, part: int | Decimal | None = None
     ) -> ReleaseNumber:
         return cls.from_tokens("range", (start, end), part=part)
 
     @classmethod
     def explicit_set(
-        cls, tokens: Sequence[str], *, part: int | None = None
+        cls, tokens: Sequence[str], *, part: int | Decimal | None = None
     ) -> ReleaseNumber:
         return cls.from_tokens("set", tokens, part=part)
 
@@ -174,7 +176,7 @@ class ReleaseNumber:
             "kind": self.kind,
             "values": [str(value) for value in self.values],
             "raw_tokens": list(self.raw_tokens),
-            "part": self.part,
+            "part": str(self.part) if isinstance(self.part, Decimal) else self.part,
         }
 
     @classmethod
@@ -199,12 +201,16 @@ class ReleaseNumber:
             raise TypeError("serialized values must contain decimal strings")
 
         part_value = data["part"]
-        if part_value is not None and (
-            isinstance(part_value, bool) or not isinstance(part_value, int)
-        ):
-            raise TypeError("serialized part must be an integer or None")
-        result = cls.from_tokens(cast(ReleaseNumberKind, kind), tokens_value, part=part_value)
-        serialized_values = tuple(_decimal_from_token(value) for value in values_value)
+        if isinstance(part_value, str):
+            part: int | Decimal | None = _decimal_from_token(part_value)
+        elif part_value is None or type(part_value) is int:
+            part = part_value
+        else:
+            raise TypeError("serialized part must be an integer, decimal string, or None")
+        result = cls.from_tokens(
+            cast(ReleaseNumberKind, kind), cast(Sequence[str], tokens_value), part=part,
+        )
+        serialized_values = tuple(_decimal_from_token(value) for value in cast(Sequence[str], values_value))
         if len(serialized_values) != len(result.values) or any(
             value.as_tuple() != expected.as_tuple()
             for value, expected in zip(serialized_values, result.values, strict=True)
@@ -213,7 +219,7 @@ class ReleaseNumber:
         return result
 
 
-def missing_release_number(*, part: int | None = None) -> ReleaseNumber:
+def missing_release_number(*, part: int | Decimal | None = None) -> ReleaseNumber:
     """Factory spelling for consumers that prefer a named free function."""
 
     return ReleaseNumber.missing(part=part)

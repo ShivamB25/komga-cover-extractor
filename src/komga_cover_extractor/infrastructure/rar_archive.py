@@ -29,6 +29,7 @@ from .zip_archive import (
     ArchiveMember,
     ArchivePolicy,
     validate_member_name,
+    zip_member_timestamp,
 )
 
 
@@ -234,7 +235,8 @@ class RarReader:
             raise ArchiveError('invalid_directory_size')
         if size > self.policy.conversion_member_max_bytes:
             raise ArchiveError('archive_member_limit')
-        return ArchiveMember(name, size, packed, bool(item.is_dir()), raw_name)
+        modified_at = zip_member_timestamp(item.mtime if item.mtime is not None else item.date_time)
+        return ArchiveMember(name, size, packed, bool(item.is_dir()), raw_name, modified_at)
 
     def _preflight_parts(self) -> None:
         assert self._rar is not None

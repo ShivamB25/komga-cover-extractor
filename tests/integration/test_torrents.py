@@ -38,7 +38,7 @@ requests = pytest.importorskip("requests")
 
 HASH = "a" * 40
 PARSING = ParsingPolicy()
-MATCHING = MatchingPolicy(match_through_image_similarity=False)
+MATCHING = MatchingPolicy()
 RANKING = RankingPolicy((RankRule("Digital", 2),))
 
 
@@ -246,6 +246,57 @@ def test_preview_and_local_apply_never_authorize_remote_effects(tmp_path: Path) 
     assert not state.state_dir.exists()
 
 
+@pytest.mark.parametrize("allow_remote", [False, True])
+def test_default_filename_only_matching_starts_related_new_series_and_signals_ready(
+    tmp_path: Path, allow_remote: bool,
+) -> None:
+    server = Server(make_files("Series Extra/Series Extra v01.cbz"))
+    server.torrents[HASH]["name"] = "Series Extra"
+    server.require_cookie = True
+    state = StateStore(tmp_path / "state")
+    ready: list[str] = []
+    with make_client(server) as client:
+        result = invoke(client, state, authorization=RunAuthorization(allow_remote=allow_remote),
+                        options={"qbittorrent_username": "fixture-user", "qbittorrent_password": "fixture-password"},
+                        on_ready=lambda: ready.append("ready"))
+    assert (result.exit_code, result.planned, result.committed, ready) == (0, 1, int(allow_remote), ["ready"])
+    assert (result.decisions[0].status, result.decisions[0].reason, result.decisions[0].candidates) == (
+        "observed", "qbit_keep_new_series", (HASH, "Series Extra/Series Extra v01.cbz", "0"),
+    )
+    assert server.calls[0][:3] == (
+        "POST", "/prefix/api/v2/auth/login", {"username": "fixture-user", "password": "fixture-password"},
+    )
+    assert all(headers.get("Cookie") == "SID=fixture-session" for _, _, _, headers in server.calls[1:])
+    assert server.mutations == ([("start", {"hashes": HASH})] if allow_remote else [])
+    assert [(file["name"], file["priority"]) for file in server.files[HASH]] == [
+        ("Series Extra/Series Extra v01.cbz", 1),
+    ]
+    assert server.torrents[HASH]["state"] == ("downloading" if allow_remote else "pausedDL")
+    if allow_remote:
+        job, = state.list_jobs(kind="qbit_action", limit=10)
+        assert (job.state, job.payload["action"]) == ("complete", {"kind": "start"})
+    else:
+        assert not state.state_dir.exists()
+
+
+def test_filename_only_matching_does_not_choose_between_ambiguous_library_series(tmp_path: Path) -> None:
+    existing = tuple(parse_release(FileObservation(Path(parent) / "Series v01.cbz"), PARSING)
+                     for parent in ("/library/first/Series", "/library/second/Series"))
+    catalog = LibrarySnapshot(existing, (LibraryRoot(Path("/library")),))
+    server = Server(make_files("Series v02.cbz"))
+    state = StateStore(tmp_path / "state")
+    with make_client(server) as client:
+        result = invoke(client, state, provider=lambda: catalog,
+                        authorization=RunAuthorization(allow_remote=True, allow_torrent_removal=True))
+    assert (result.exit_code, result.planned, result.committed) == (3, 0, 0)
+    assert [(decision.status, decision.candidates) for decision in result.decisions] == [
+        ("review_required", (HASH, "Series v02.cbz", "0")),
+    ]
+    assert server.mutations == []
+    assert (server.torrents[HASH]["state"], server.files[HASH][0]["priority"]) == ("pausedDL", 1)
+    assert not state.state_dir.exists()
+
+
 @pytest.mark.parametrize(("version", "method"), [("2.8.2", "resume"), ("2.11.0", "start")])
 def test_form_endpoints_version_branch_and_verified_action_journal(
     tmp_path: Path, version: str, method: str,
@@ -328,6 +379,51 @@ def test_removal_is_separately_authorized_and_never_deletes_content(tmp_path: Pa
     ]
     assert (HASH not in server.torrents) is allow_removal
     assert server.files[HASH][0]["name"] == "Series v01.cbz"
+
+
+@pytest.mark.parametrize("kept_name", ["Series v02.cbz", "notes.txt"])
+def test_user_unchecked_retained_file_does_not_authorize_torrent_removal(tmp_path: Path, kept_name: str) -> None:
+    files = make_files("Series v01.cbz", kept_name)
+    files[1]["priority"] = 0
+    server = Server(files)
+    state = StateStore(tmp_path / "state")
+    with make_client(server) as client:
+        result = invoke(client, state, authorization=RunAuthorization(allow_remote=True, allow_torrent_removal=True))
+    assert (result.exit_code, result.committed, result.planned) == (0, 2, 2)
+    assert server.mutations == [
+        ("filePrio", {"hash": HASH, "id": "0", "priority": "0"}),
+        ("start", {"hashes": HASH}),
+    ]
+    assert [(file["name"], file["priority"]) for file in server.files[HASH]] == [
+        ("Series v01.cbz", 0), (kept_name, 0),
+    ]
+    assert server.torrents[HASH]["state"] == "downloading"
+    assert result.decisions[-1].reason == "qbit_start_reconciled"
+
+
+@pytest.mark.parametrize("allow_removal", [False, True])
+@pytest.mark.parametrize(("name", "options", "reason"), [
+    ("Series v01.cbz", {}, "qbit_exclude_lower_rank"),
+    ("Rejected.cbz", {"delete_unacceptable_files_toggle": True, "unacceptable_keywords": ("Rejected",)},
+     "qbit_exclude_unacceptable_basename"),
+])
+def test_already_unchecked_policy_exclusions_remove_only_with_separate_authorization(
+    tmp_path: Path, allow_removal: bool, name: str, options: dict[str, object], reason: str,
+) -> None:
+    files = make_files(name)
+    files[0]["priority"] = 0
+    server = Server(files)
+    state = StateStore(tmp_path / "state")
+    with make_client(server) as client:
+        result = invoke(client, state, options=options,
+                        authorization=RunAuthorization(allow_remote=True, allow_torrent_removal=allow_removal))
+    assert (result.exit_code, result.committed) == (0, int(allow_removal))
+    assert (result.decisions[0].status, result.decisions[0].reason) == ("skipped", reason)
+    assert server.mutations == ([("delete", {"hashes": HASH, "deleteFiles": "false"})] if allow_removal else [])
+    assert (HASH not in server.torrents) is allow_removal
+    assert [(file["name"], file["priority"]) for file in server.files[HASH]] == [(name, 0)]
+    if not allow_removal:
+        assert not state.state_dir.exists()
 
 
 def test_login_uses_cookie_and_durable_payloads_do_not_include_credentials(tmp_path: Path) -> None:

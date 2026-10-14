@@ -350,10 +350,11 @@ def _assert_source_identity(book: Path, before: os.stat_result) -> None:
 
 
 def inspect_book_job(request: dict[str, object]) -> dict[str, object]:
-    if set(request) - {'book', 'root', 'archive_policy', 'header_only'} or not {'book', 'root', 'archive_policy'} <= set(request):
+    if set(request) - {'book', 'root', 'archive_policy', 'header_only', 'readiness_only'} or not {'book', 'root', 'archive_policy'} <= set(request):
         raise WorkerError('invalid_inspect_request')
     header_only = request.get('header_only', False)
-    if type(header_only) is not bool:
+    readiness_only = request.get('readiness_only', False)
+    if type(header_only) is not bool or type(readiness_only) is not bool or header_only and readiness_only:
         raise WorkerError('invalid_inspect_request')
     book_value, root_value = request['book'], request['root']
     if not isinstance(book_value, str) or not book_value or not isinstance(root_value, str) or not root_value:
@@ -372,25 +373,38 @@ def inspect_book_job(request: dict[str, object]) -> dict[str, object]:
         _assert_source_identity(book, before)
         return {'status': 'valid', 'container': container, 'source_fingerprint': source.as_dict()}
     with open_archive_reader(book, root=root, policy=policy) as reader:
+        if readiness_only:
+            sources = getattr(reader, "sources", None)
+            if sources is None:
+                sources = (fingerprint(book, root),)
+            reader.assert_unchanged()
+            _assert_source_identity(book, before)
+            return {'status': 'valid', 'container': container,
+                    'source_fingerprints': [source.as_dict() for source in sources]}
         metadata = read_book_metadata(reader)
-        members = sorted(reader.members(), key=lambda member: member.name)
+        members = sorted(reader.members(), key=lambda member: member.raw_name)
         pages = [member for member in members if not member.is_dir
                  and PurePosixPath(member.name).suffix.lower() in RASTER_SUFFIXES
                  and not PurePosixPath(member.name).name.startswith(('.', '__'))]
         if len(pages) > policy.cover_max_candidates:
             raise WorkerError('cover_candidate_limit')
         observations: list[dict[str, object]] = [
-            {'name': member.name, 'is_grayscale': None, 'is_directory': member.is_dir}
+            {'name': member.raw_name, 'is_grayscale': None, 'is_directory': member.is_dir}
             for member in members
         ]
-        if members and pages and members[0] is pages[0]:
+        if (container != 'epub' and members and not members[0].is_dir
+                and PurePosixPath(members[0].raw_name).suffix in RASTER_SUFFIXES):
             from .images import observe_image
             data = reader.read_member(members[0].name, max_bytes=policy.cover_member_max_bytes)
             observation = observe_image(data, max_pixels=policy.image_max_pixels)
             observations[0]['is_grayscale'] = observation.is_grayscale
         reader.assert_unchanged()
+        sources = getattr(reader, "sources", None)
+        if sources is None:
+            sources = (fingerprint(book, root),)
         _assert_source_identity(book, before)
         diagnostics = [metadata.reason] if metadata.reason else []
         return {'status': 'valid', 'container': container, 'metadata_status': metadata.status,
                 'metadata': [list(pair) for pair in metadata.values], 'metadata_reason': metadata.reason,
-                'archive_pages': observations, 'diagnostics': diagnostics}
+                'archive_pages': observations, 'diagnostics': diagnostics,
+                'source_fingerprints': [source.as_dict() for source in sources]}

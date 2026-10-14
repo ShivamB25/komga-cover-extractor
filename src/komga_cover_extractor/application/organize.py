@@ -1,8 +1,6 @@
 """Ordered organization decisions over original bytes and a virtual path view."""
 from __future__ import annotations
 
-import os
-import select
 import stat
 import sys
 from collections.abc import Mapping, Sequence
@@ -54,7 +52,12 @@ from ..parsing.normalization import (
     remove_dual_space,
     similar,
 )
-from .planning import build_file_plan, project_release
+from .planning import (
+    build_file_plan,
+    project_release,
+    read_interactive_line,
+    unready_download_inputs,
+)
 
 OPTIONS = (
     "delete_unacceptable_files_toggle", "delete_chapters_from_downloads_toggle",
@@ -79,6 +82,50 @@ def _after_matching(command: str, stage: str) -> bool:
 def _source_path(release: ReleaseSnapshot) -> Path:
     observed = release.observation.fingerprint
     return release.path if observed is None else observed.path
+
+
+def _ordinary_release(release: ReleaseSnapshot, parsing: ParsingPolicy) -> bool:
+    return parsing.chapter_support_toggle or release.kind != "chapter"
+
+
+def _existing_library_view(catalog: LibrarySnapshot) -> LibrarySnapshot:
+    roots = tuple(root for root in catalog.roots
+                  if "library" in root.roles and "download" not in root.roles)
+    return replace(catalog, roots=roots, releases=tuple(
+        release for release in catalog.releases if any(root.contains(release.path) for root in roots)
+    ))
+
+
+def _ignored_folder(path: Path, ignored: tuple[str, ...]) -> bool:
+    return any(part in ignored for part in path.parts)
+
+
+def _ready_sources(
+    files: Mapping[Path, FileFingerprint], roots: tuple[LibraryRoot, ...],
+    ready_downloads: tuple[FileFingerprint, ...] | None,
+) -> frozenset[Path]:
+    if ready_downloads is None:
+        return frozenset(files)
+    ready = {observation.path: observation for observation in ready_downloads}
+    download_roots = tuple(root for root in roots if "download" in root.roles)
+    return frozenset(path for path, observation in files.items()
+                     if not any(root.contains(path) for root in download_roots)
+                     or ready.get(path) == observation)
+
+
+def _matching_download(
+    release: ReleaseSnapshot, roots: tuple[LibraryRoot, ...], *,
+    parsing: ParsingPolicy, ready_sources: frozenset[Path],
+    ignored_folder_names: tuple[str, ...], group_root_items: bool,
+) -> bool:
+    source = _source_path(release)
+    if (not _ordinary_release(release, parsing) or source not in ready_sources
+            or _ignored_folder(source.parent, ignored_folder_names)):
+        return False
+    return any("download" in root.roles and root.contains(release.path) for root in roots) and (
+        group_root_items
+        or not any(release.parent == root.path and "download" in root.roles for root in roots)
+    )
 
 
 def _same_domain(left: ReleaseSnapshot, right: ReleaseSnapshot) -> bool:
@@ -158,6 +205,7 @@ def plan_organization(
     choices: Mapping[tuple[str, Path], str] | None = None,
     previous_plans: Sequence[OperationPlan] = (), cancel: Event | None = None,
     scope_sources: frozenset[Path] | None = None,
+    ready_downloads: tuple[FileFingerprint, ...] | None = None,
 ) -> RunResult:
     """Plan organize/duplicates or either ordered organizer segment of ``run``.
 
@@ -172,6 +220,7 @@ def plan_organization(
         return RunResult((Decision("invalid_input", "invalid_organizer_options"),))
     settings = {key: options.get(key, False) for key in OPTIONS}
     observed_files = dict(files)
+    ready_sources = _ready_sources(observed_files, roots, ready_downloads)
     original: dict[Path, ReleaseSnapshot] = {}
     locations = {path: path for path in observed_files}
     for release in (*catalog.releases, *releases):
@@ -179,6 +228,9 @@ def plan_organization(
         original[source] = release
         locations[source] = release.path
     selected = {_source_path(release) for release in releases}
+    ordinary_sources = frozenset(source for source, release in original.items()
+                                 if _ordinary_release(release, parsing))
+    eligible_sources = ordinary_sources.intersection(ready_sources)
     retired: dict[Path, str] = {}
     replacements: set[Path] = set()
     generated: dict[Path, tuple[FileFingerprint, ArtifactSpec]] = {}
@@ -230,7 +282,8 @@ def plan_organization(
     for source, release in original.items():
         observed = release.observation.fingerprint
         if observed is None or observed_files.get(source) != observed:
-            decisions.append(Decision("review_required", "release_source_unobserved_or_changed", source))
+            if ready_downloads is None or source in ready_sources:
+                decisions.append(Decision("review_required", "release_source_unobserved_or_changed", source))
             blocked.add(source)
     def ignored_source(source: Path) -> bool:
         root = next((root for root in roots if root.contains(source)), None)
@@ -238,9 +291,11 @@ def plan_organization(
             return True
         relative = source.relative_to(root.path)
         return (any(part.startswith(".") for part in relative.parts)
-                or any(part in ignored_folder_names for part in relative.parent.parts))
+                or _ignored_folder(source.parent, ignored_folder_names))
 
     for source in original:
+        if ready_downloads is not None and source not in ready_sources:
+            decisions.append(Decision("observed", "watch_candidate_not_ready", source))
         if ignored_source(source):
             blocked.add(source)
         elif locations[source].suffix.lower() not in matching.classification.supported_extensions:
@@ -275,7 +330,19 @@ def plan_organization(
     def library(source: Path) -> bool:
         return any("library" in root.roles and root.contains(locations[source]) for root in roots)
 
+    def ready_group(source: Path) -> bool:
+        if ready_downloads is None:
+            return True
+        waiting = tuple(path for path in (source, *sidecars.get(source, ())) if path not in ready_sources)
+        if waiting:
+            decisions.append(Decision("delivery_deferred", "watch_scope_not_ready", source,
+                                      tuple(str(path) for path in waiting)))
+            return False
+        return True
+
     def approved(action: str, source: Path, target: Path | None = None) -> bool:
+        if source in observed_files and not ready_group(source):
+            return False
         manual = settings["manual_rename" if action == "rename" else "manual_delete"]
         if not manual:
             return True
@@ -300,6 +367,8 @@ def plan_organization(
     def relocate(source: Path, target: Path, *, rename: bool = False, reason: str | None = None) -> bool:
         if source in blocked or source in retired or locations[source] == target:
             return False
+        if not ready_group(source):
+            return False
         if rename and not approved("rename", source, target):
             return False
         prior = locations[source]
@@ -322,6 +391,14 @@ def plan_organization(
         members = [source for source, path in locations.items() if source not in retired and path.is_relative_to(folder)]
         if any(source in blocked for source in members):
             decisions.append(Decision("review_required", "folder_contains_unresolved_release", folder))
+            return
+        if any(source in original and source not in ordinary_sources for source in members):
+            decisions.append(Decision("no_match", "folder_contains_disabled_chapter", folder))
+            return
+        waiting = tuple(source for source in members if source not in ready_sources)
+        if waiting:
+            decisions.append(Decision("delivery_deferred", "watch_scope_not_ready", folder,
+                                      tuple(str(source) for source in waiting)))
             return
         opaque = [path for path in directories_set if path.is_relative_to(folder)
                   and (path.name.startswith(".kce-") or path.name in ignored_folder_names)]
@@ -371,6 +448,12 @@ def plan_organization(
                 if (not any("download" in root.roles and root.contains(source) for root in roots)
                         or ignored_source(source)):
                     continue
+                if source not in ready_sources:
+                    if source not in original:
+                        decisions.append(Decision("observed", "watch_candidate_not_ready", source))
+                    continue
+                if source in original and source not in ordinary_sources:
+                    continue
                 if any(pattern.search(source.name) for pattern in patterns):
                     if source in blocked or not approved("retire", source):
                         continue
@@ -379,10 +462,10 @@ def plan_organization(
                     else:
                         retired[source] = "unacceptable_file"
                     decisions.append(Decision("planned", "quarantine_unacceptable_file", source))
-        if filters and settings["delete_chapters_from_downloads_toggle"]:
+        if filters and settings["delete_chapters_from_downloads_toggle"] and parsing.exception_keywords:
             exception_patterns = tuple(regex.compile(pattern, regex.IGNORECASE) for pattern in parsing.exception_keywords)
             for source, release in active().items():
-                if source not in selected or source in blocked or not download(source):
+                if source not in selected or source not in ready_sources or source in blocked or not download(source):
                     continue
                 if (release.kind == "chapter" and release.path.suffix.lower() in matching.classification.manga_extensions
                         and not parsing.number_policy._compiled.volume_marker.search(release.name)
@@ -392,7 +475,7 @@ def plan_organization(
                     decisions.append(Decision("planned", "quarantine_chapter_release", source))
         if before and settings["rename_files_in_download_folders_toggle"]:
             for source, release in active().items():
-                if source in selected and source not in blocked and download(source):
+                if source in selected and source in eligible_sources and source not in blocked and download(source):
                     try:
                         target = release.parent / render_release(release, renaming)
                     except ValueError:
@@ -402,7 +485,7 @@ def plan_organization(
                     relocate(source, target, rename=True)
         if before and settings["create_folders_for_items_in_download_folder_toggle"]:
             for source, release in active().items():
-                if source not in selected or source in blocked or not download(source):
+                if source not in selected or source not in eligible_sources or source in blocked or not download(source):
                     continue
                 root = next(root for root in roots if root.contains(release.path))
                 if release.parent != root.path or not release.display_series:
@@ -433,16 +516,16 @@ def plan_organization(
                     new_name = regex.sub(regex.escape(release.display_series), lambda _: directory.name,
                                          release.name, flags=regex.IGNORECASE, count=1)
                     target = directory / new_name
-                relocate(source, target, rename=rename, reason="group_lone_release")
-                directories_set.add(directory)
+                if relocate(source, target, rename=rename, reason="group_lone_release"):
+                    directories_set.add(directory)
 
     if command == "duplicates" or before and settings["check_for_duplicate_volumes_toggle"]:
         duplicate_groups: dict[
-            tuple[Path, str, str, str, ReleaseNumberKind, tuple[Decimal, ...], int | None, bool],
+            tuple[Path, str, str, str, ReleaseNumberKind, tuple[Decimal, ...], int | Decimal | None, bool],
             list[Path],
         ] = {}
         for source, release in active().items():
-            if source in blocked or release.number.kind == "missing":
+            if source not in eligible_sources or source in blocked or release.number.kind == "missing":
                 continue
             if command != "duplicates" and not download(source):
                 continue
@@ -474,7 +557,7 @@ def plan_organization(
         else:
             folder_sources: dict[Path, list[Path]] = {}
             for source in sorted(selected):
-                if source not in retired:
+                if source in eligible_sources and source not in retired:
                     folder_sources.setdefault(locations[source].parent, []).append(source)
             ordering: list[Path] = []
             for folder in sorted(folder_sources, key=lambda path: (-len(path.parts), str(path))):
@@ -493,16 +576,16 @@ def plan_organization(
                 if source not in view or source in blocked or not download(source):
                     continue
                 incoming = view[source]
+                if any(incoming.parent == root.path and "download" in root.roles for root in roots):
+                    continue
                 if not incoming.display_series or incoming.number.kind == "missing":
                     decisions.append(Decision("no_match", "series_or_release_number_missing", source))
                     continue
-                library_candidates: tuple[ReleaseSnapshot, ...] = tuple(
+                library_view = _existing_library_view(LibrarySnapshot(tuple(
                     release for other, release in view.items()
-                    if other != source and other not in blocked and library(other)
-                )
-                library_roots = tuple(root for root in roots if "library" in root.roles)
-                match = match_series(incoming, LibrarySnapshot(library_candidates, library_roots), matching,
-                                     cover_similarity=cover_similarity)
+                    if other != source and other in eligible_sources and other not in blocked
+                ), roots))
+                match = match_series(incoming, library_view, matching, cover_similarity=cover_similarity)
                 if match.status != "matched" or match.selected is None:
                     decisions.append(Decision(cast(Status, match.status), match.reason, source,
                                               tuple(str(candidate.series_path) for candidate in match.candidates)))
@@ -524,16 +607,26 @@ def plan_organization(
                 else:
                     target_name = incoming.name
                 target = destination_folder / target_name
-                overlapping = [other for other, release in view.items() if other != source and other not in blocked
+                overlapping = [other for other, release in view.items()
+                               if other != source and other in eligible_sources and other not in blocked
                                and release.parent == destination_folder and _overlapping(incoming, release)]
                 if overlapping:
+                    comparisons = [_quality(incoming, view[other], ranking, source_artifacts) for other in overlapping]
+                    evidence_upgrade = (
+                        match.selected.evidence in {
+                            "cover_similarity", "cached_cover_similarity",
+                            "unique_identifier", "cached_unique_identifier",
+                        }
+                        and len(overlapping) == 1 and _same_domain(incoming, view[overlapping[0]])
+                        and comparisons[0] == ("upgrade", "strictly_higher_rank")
+                    )
                     uncertain_identity = [other for other in overlapping
                                           if view[other].canonical_series_key != incoming.canonical_series_key
                                           and similar(clean_str(view[other].display_series), clean_str(incoming.display_series))
                                           < matching.required_similarity_score]
                     choice = answers.get(("duplicate", source))
                     allowed_choices = {"skip", str(source), *(str(other) for other in overlapping)}
-                    if uncertain_identity and choice not in allowed_choices:
+                    if uncertain_identity and not evidence_upgrade and choice not in allowed_choices:
                         decisions.append(Decision("review_required", "duplicate_choice_required", source,
                                                   tuple(str(other) for other in (source, *overlapping))))
                         blocked.add(source)
@@ -549,7 +642,6 @@ def plan_organization(
                                                   tuple(str(other) for other in overlapping)))
                         blocked.add(source)
                         continue
-                    comparisons = [_quality(incoming, view[other], ranking, source_artifacts) for other in overlapping]
                     chosen = answers.get(("duplicate", source))
                     if chosen == "skip":
                         decisions.append(Decision("skipped", "duplicate_choice_declined", source))
@@ -557,14 +649,15 @@ def plan_organization(
                         continue
                     if chosen is not None and Path(chosen) == source:
                         comparisons = [("upgrade", "explicit_duplicate_choice") for _ in overlapping]
-                    if ("identifier" in match.reason and any(reason != "identical_content" for _, reason in comparisons)
+                    if ("identifier" in match.reason and not evidence_upgrade
+                            and any(reason != "identical_content" for _, reason in comparisons)
                             and chosen not in allowed_choices - {"skip"}):
                         decisions.append(Decision("review_required", "duplicate_choice_required", source,
                                                   tuple(str(other) for other in (source, *overlapping))))
                         blocked.add(source)
                         continue
                     if all(status == "upgrade" for status, _ in comparisons):
-                        approvals = [approved("retire", other) for other in overlapping]
+                        approvals = [ready_group(source), *(approved("retire", other) for other in overlapping)]
                         if target_name != incoming.name:
                             approvals.append(approved("rename", source, target))
                         if not all(approvals):
@@ -599,13 +692,15 @@ def plan_organization(
 
     if after and settings["rename_dirs_in_download_folder_toggle"]:
         view = active()
-        folders = sorted({release.parent for source, release in view.items() if source in selected and download(source)},
+        folders = sorted({release.parent for source, release in view.items()
+                          if source in selected and source in eligible_sources and download(source)},
                          key=lambda path: (-len(path.parts), str(path)))
         for folder in folders:
             if any(folder == root.path for root in roots):
                 continue
             folder_releases: list[ReleaseSnapshot] = sorted(
-                (release for release in active().values() if release.parent == folder), key=lambda release: release.name
+                (release for source, release in active().items()
+                 if source in eligible_sources and release.parent == folder), key=lambda release: release.name
             )
             agreement = folder_series_agreement(folder_releases, matching.classification)
             name = ""
@@ -620,11 +715,13 @@ def plan_organization(
                 rename_folder(folder, folder.parent / name)
     if after and settings["move_series_to_correct_library_toggle"]:
         view = active()
-        moved = {source for source in selected if source not in retired and source not in blocked and library(source)
+        moved = {source for source in selected
+                 if source in eligible_sources and source not in retired and source not in blocked and library(source)
                  and (command == "organize" or locations[source] != _source_path(original[source]))}
         for folder in sorted({view[source].parent for source in moved}):
             routing_releases: tuple[ReleaseSnapshot, ...] = tuple(
-                release for release in active().values() if release.parent == folder
+                release for source, release in active().items()
+                if source in eligible_sources and release.parent == folder
             )
             classification = matching.classification
             chapter_share = sum(release.kind == "chapter" for release in routing_releases) / len(routing_releases)
@@ -649,6 +746,14 @@ def plan_organization(
         if len(sources) < 2 or len({source_artifacts[source].digest if source in source_artifacts
                                    else observed_files[source].sha256 for source in sources}) != 1:
             continue
+        waiting = tuple(source for source in sources if source not in ready_sources)
+        if waiting:
+            return RunResult(
+                tuple(decision for decision in decisions if decision.status != "planned")
+                + (Decision("delivery_deferred", "watch_scope_not_ready", target,
+                            tuple(str(source) for source in waiting)),),
+                releases=tuple(original.values()),
+            )
         keeper = target if target in sources else min(sources)
         losers = [source for source in sources if source != keeper]
         art_keys = {
@@ -716,12 +821,14 @@ def plan_organization(
             continue
         if existing_paths and not moving_owned_art:
             origin_folders = {source.parent for source in existing_paths}
-            member_sources = [source for source, release in view.items() if release.parent == folder]
+            member_sources = [source for source, release in view.items()
+                              if source in eligible_sources and release.parent == folder]
             retired_owners = any(source in retired and source.parent in origin_folders for source in original)
             if (not retired_owners and member_sources
                     and all(source.parent in origin_folders for source in member_sources)):
                 continue
-        members_by_source = {source: release for source, release in view.items() if release.parent == folder}
+        members_by_source = {source: release for source, release in view.items()
+                             if source in eligible_sources and release.parent == folder}
         if not members_by_source:
             for image in existing_paths:
                 if owners.get(image) in retired:
@@ -799,6 +906,17 @@ def plan_organization(
                                source_artifacts=source_artifacts, cleanup_sources=cleanup_sources,
                                links=links, reasons=operation_reasons,
                                policy_version=policy_version, reason="duplicate_cleanup" if command == "duplicates" else "organization")
+    unready_inputs = () if ready_downloads is None else unready_download_inputs(
+        tuple(operation for plan in compiled.plans for operation in plan.operations),
+        files=observed_files, roots=roots, ready_downloads=ready_downloads,
+    )
+    if unready_inputs:
+        return RunResult(
+            (*tuple(decision for decision in decisions if decision.status != "planned"),
+             Decision("delivery_deferred", "watch_scope_not_ready", unready_inputs[0].path,
+                      tuple(str(source.path) for source in unready_inputs))),
+            releases=tuple(original.values()), planned_count=0,
+        )
     if not compiled.plans and compiled.exit_code:
         return replace(compiled, decisions=tuple(decision for decision in decisions if decision.status != "planned") + compiled.decisions,
                        releases=tuple(original.values()))
@@ -826,6 +944,9 @@ def observe_organization_files(
     files: dict[Path, FileFingerprint] = {}
     directories: list[Path] = []
     for root in roots:
+        if _ignored_folder(root.path, ignored):
+            directories.append(root.path)
+            continue
         pending = [root.path]
         while pending:
             if cancel.is_set():
@@ -855,7 +976,6 @@ def observe_organization_files(
 
 
 def _manual_answers(result: RunResult, choices: dict[tuple[str, Path], str], cancel: Event) -> bool:
-    descriptor = sys.stdin.fileno()
     pending = bytearray()
     changed = False
     for decision in result.decisions:
@@ -873,26 +993,7 @@ def _manual_answers(result: RunResult, choices: dict[tuple[str, Path], str], can
             sys.stderr.write(f"{'Rename' if action == 'rename' else 'Quarantine'} {decision.path}"
                              + (f" to {target}" if action == "rename" else "") + "? [yes/no] ")
         sys.stderr.flush()
-        while True:
-            if cancel.is_set():
-                raise WorkerError("shutdown_requested", "cancelled")
-            newline = pending.find(b"\n")
-            if newline >= 0:
-                try:
-                    answer = pending[:newline].decode("utf-8").strip().lower()
-                except UnicodeDecodeError:
-                    raise WorkerError("invalid_interactive_input", "invalid_input") from None
-                del pending[:newline + 1]
-                break
-            if len(pending) > 4096:
-                raise WorkerError("interactive_input_byte_limit", "invalid_input")
-            ready, _, _ = select.select((descriptor,), (), (), 0.2)
-            if not ready:
-                continue
-            chunk = os.read(descriptor, min(4096, 4097 - len(pending)))
-            if not chunk:
-                raise WorkerError("interactive_input_closed", "cancelled")
-            pending.extend(chunk)
+        answer = read_interactive_line(cancel, pending)
         if action == "duplicate" and answer.isdecimal() and 1 <= int(answer) <= len(decision.candidates):
             choices[key] = decision.candidates[int(answer) - 1]
         elif action != "duplicate" and answer in {"yes", "y"}:
@@ -903,6 +1004,34 @@ def _manual_answers(result: RunResult, choices: dict[tuple[str, Path], str], can
             continue
         changed = True
     return changed
+
+
+def _validate_owned_series_artwork(
+    result: RunResult, policy: CoverPolicy | None, cancel: Event,
+) -> RunResult | None:
+    from ..infrastructure.workers import run_worker
+    for plan in result.plans:
+        for operation in plan.operations:
+            artifact = operation.artifact
+            if (operation.kind != "publish" or operation.reason != "owned_series_artwork"
+                    or artifact is None or artifact.source is None):
+                continue
+            if policy is None:
+                return RunResult(
+                    (Decision("missing_dependency", "cover_policy_required_for_artwork_validation"),),
+                    releases=result.releases,
+                )
+            observed = artifact.source
+            response = run_worker(
+                "inspect", {"artwork_image": True, "fingerprint": observed.as_dict(),
+                            "max_bytes": policy.archive_policy.cover_member_max_bytes,
+                            "max_pixels": policy.archive_policy.image_max_pixels},
+                timeout=policy.archive_policy.conversion_timeout_seconds,
+                max_output_bytes=64 * 1024, cancel=cancel,
+            )
+            if response.get("suffix") != operation.destination.suffix.lower():
+                return RunResult((Decision("invalid_input", "artwork_suffix_mismatch", observed.path),))
+    return None
 
 
 def prepare_organization_group(
@@ -918,6 +1047,7 @@ def prepare_organization_group(
     files: Mapping[Path, FileFingerprint],
     directories: Sequence[Path],
     before: Sequence[ReleaseSnapshot] = (),
+    ready_downloads: tuple[FileFingerprint, ...] | None = None,
 ) -> RunResult:
     """Prepare one connected group, resolving owned artwork without publishing it."""
     roots = normalize_library_roots(roots)
@@ -928,19 +1058,29 @@ def prepare_organization_group(
     try:
         files = dict(files)
         directories = tuple(directories)
+        ready_sources = _ready_sources(files, roots, ready_downloads)
         affected = set(scope_sources or (_source_path(release) for release in releases))
         if _after_matching(command, stage) and options.get("check_for_existing_series_toggle", False):
+            matching_catalog = _existing_library_view(replace(catalog, roots=roots, releases=tuple(
+                release for release in catalog.releases if _ordinary_release(release, parsing)
+                and not _ignored_folder(_source_path(release).parent, ignored_folder_names)
+            )))
             for release in releases:
-                if not any("download" in root.roles and root.contains(release.path) for root in roots):
+                if not _matching_download(
+                    release, roots, parsing=parsing, ready_sources=ready_sources,
+                    ignored_folder_names=ignored_folder_names,
+                    group_root_items=options.get("create_folders_for_items_in_download_folder_toggle", False),
+                ):
                     continue
-                match = match_series(release, catalog, matching, cover_similarity=cover_similarity)
+                match = match_series(release, matching_catalog, matching, cover_similarity=cover_similarity)
                 if match.status in {"matched", "ambiguous"}:
                     candidate_series_paths = {candidate.series_path for candidate in match.candidates}
-                    affected.update(_source_path(candidate) for candidate in catalog.releases
+                    affected.update(_source_path(candidate) for candidate in matching_catalog.releases
                                     if candidate.parent in candidate_series_paths)
         affected_parents = {source.parent for source in affected}
         affected.update(path for path in files if path.parent in affected_parents
                         and path.suffix.lower() in IMAGE_SUFFIXES)
+        affected.intersection_update(ready_sources)
         for source in sorted(affected):
             if cancel.is_set():
                 return RunResult((Decision("cancelled", "shutdown_requested", source),))
@@ -957,7 +1097,7 @@ def prepare_organization_group(
             if current is None:
                 return RunResult((Decision("stale_plan", "release_source_missing", source),))
             source_before = release.observation.fingerprint
-            if source_before is not None and source_before != current:
+            if source_before is not None and source_before != current and source in ready_sources:
                 return RunResult((Decision("stale_plan", "release_source_fingerprint_changed", source),))
             snapshots[source] = replace(release, observation=replace(release.observation, fingerprint=current))
         selected = tuple(snapshots[_source_path(release)] for release in releases)
@@ -965,6 +1105,8 @@ def prepare_organization_group(
         provenance_books = dict(snapshots)
         for release in before:
             source = _source_path(release)
+            if ready_downloads is not None and source not in ready_sources:
+                continue
             observation = release.observation.fingerprint
             if observation is None or files.get(source) != observation:
                 return RunResult((Decision("stale_plan", "provenance_source_fingerprint_changed", source),))
@@ -996,7 +1138,7 @@ def prepare_organization_group(
                 command=command, stage=stage, unacceptable_keywords=unacceptable_keywords,
                 ignored_folder_names=ignored_folder_names, cover_similarity=cover_similarity, series_policy=series_policy,
                 series_art_owners=owners, artwork=artwork, choices=choices, cancel=cancel,
-                previous_plans=previous_plans, scope_sources=scope_sources,
+                previous_plans=previous_plans, scope_sources=scope_sources, ready_downloads=ready_downloads,
             )
             required = tuple(decision.path for decision in planned.decisions
                              if decision.reason == "replacement_book_artwork_required" and decision.path not in artwork)
@@ -1023,25 +1165,9 @@ def prepare_organization_group(
             break
         if not planned.plans:
             return planned
-        if cover_policy is not None:
-            from ..infrastructure.workers import run_worker
-            for plan in planned.plans:
-                for operation in plan.operations:
-                    artifact = operation.artifact
-                    if (operation.kind == "publish" and operation.reason == "owned_series_artwork"
-                            and artifact is not None and artifact.source is not None):
-                        observed = artifact.source
-                        response = run_worker("inspect", {"artwork_image": True, "fingerprint": observed.as_dict(),
-                                                      "max_bytes": cover_policy.archive_policy.cover_member_max_bytes,
-                                                      "max_pixels": cover_policy.archive_policy.image_max_pixels},
-                                                      timeout=cover_policy.archive_policy.conversion_timeout_seconds,
-                                                      max_output_bytes=64 * 1024, cancel=cancel)
-                        if response.get("suffix") != operation.destination.suffix.lower():
-                            return RunResult((Decision("invalid_input", "artwork_suffix_mismatch", observed.path),))
-        elif any(operation.kind == "publish" and operation.reason == "owned_series_artwork"
-                 and operation.artifact is not None and operation.artifact.source is not None
-                 for plan in planned.plans for operation in plan.operations):
-            return RunResult((Decision("missing_dependency", "cover_policy_required_for_artwork_validation"),), releases=planned.releases)
+        invalid_artwork = _validate_owned_series_artwork(planned, cover_policy, cancel)
+        if invalid_artwork is not None:
+            return invalid_artwork
         return planned
     except WorkerError as error:
         status = cast(Status, error.status)
@@ -1091,6 +1217,7 @@ def organize_group(
     cover_similarity: CoverSimilarity | None = None, cover_policy: CoverPolicy | None = None,
     series_policy: SeriesCoverPolicy | None = None, previous_plans: Sequence[OperationPlan] = (),
     scope_sources: frozenset[Path] | None = None,
+    ready_downloads: tuple[FileFingerprint, ...] | None = None,
 ) -> RunResult:
     prepared = prepare_organization_group(
         releases, catalog, roots=roots, parsing=parsing, renaming=renaming, matching=matching,
@@ -1098,7 +1225,7 @@ def organize_group(
         files=files, directories=directories, interactive=interactive, command=command, stage=stage,
         unacceptable_keywords=unacceptable_keywords, ignored_folder_names=ignored_folder_names,
         cover_similarity=cover_similarity, cover_policy=cover_policy, series_policy=series_policy,
-        previous_plans=previous_plans, scope_sources=scope_sources,
+        previous_plans=previous_plans, scope_sources=scope_sources, ready_downloads=ready_downloads,
     )
     return apply_organization(prepared, roots=roots, state_dir=state_dir, authorization=authorization,
                               cancel=cancel, max_stage_bytes=cover_policy.archive_policy.conversion_scratch_max_bytes
@@ -1113,11 +1240,17 @@ def organization_groups(
     releases: Sequence[ReleaseSnapshot], catalog: LibrarySnapshot, *,
     roots: tuple[LibraryRoot, ...], matching: MatchingPolicy,
     cover_similarity: CoverSimilarity | None = None,
+    ready_downloads: tuple[FileFingerprint, ...] | None = None,
 ) -> tuple[tuple[ReleaseSnapshot, ...], ...]:
     """Keep one source series and shared destination evidence in one job."""
     values = {_source_path(release): release for release in releases}
+    observations = {_source_path(release): observed
+                    for release in (*catalog.releases, *releases)
+                    if (observed := release.observation.fingerprint) is not None}
+    ready_sources = _ready_sources(observations, roots, ready_downloads)
     parent = {source: source for source in values}
     root_paths = {root.path for root in roots}
+    matching_catalog = _existing_library_view(replace(catalog, roots=roots))
 
     def leader(source: Path) -> Path:
         while parent[source] != source:
@@ -1127,16 +1260,19 @@ def organization_groups(
 
     indexes: dict[tuple[object, ...], Path] = {}
     for source, release in sorted(values.items()):
+        if ready_downloads is not None and source not in ready_sources:
+            continue
         keys: list[tuple[object, ...]] = []
         if release.parent not in root_paths:
             keys.append(("source_directory", release.parent))
         if release.canonical_series_key:
             medium = "novel" if release.path.suffix.lower() in matching.classification.novel_extensions else "comic"
             keys.append(("series", release.canonical_series_key, release.kind, medium))
-        if catalog.available and any("download" in root.roles and root.contains(release.path) for root in roots):
-            candidates = tuple(item for item in catalog.releases if _source_path(item) != source
-                               and any("library" in root.roles and root.contains(item.path) for root in roots))
-            decision = match_series(release, LibrarySnapshot(candidates, roots), matching, cover_similarity=cover_similarity)
+        if (catalog.available and release.parent not in root_paths
+                and any("download" in root.roles and root.contains(release.path) for root in roots)):
+            candidates = tuple(item for item in matching_catalog.releases if _source_path(item) != source)
+            decision = match_series(release, replace(matching_catalog, releases=candidates), matching,
+                                    cover_similarity=cover_similarity)
             if decision.status == "matched" and decision.selected is not None:
                 keys.append(("source_directory", decision.selected.series_path))
         for key in keys:

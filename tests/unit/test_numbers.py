@@ -98,6 +98,17 @@ def test_volume_and_chapter_parts_are_separate_integers() -> None:
     assert chapter.part == 10
 
 
+@pytest.mark.parametrize(("suffix", "part"), [("x0", 0), ("x1.5", Decimal("1.5")), ("#1.5", Decimal("1.5"))])
+def test_originally_accepted_chapter_parts_remain_separate_from_chapter_number(
+    suffix: str, part: int | Decimal,
+) -> None:
+    number = parse_release_number(f"Series c053{suffix}.cbz", "chapter", NumberPolicy())
+    assert number.values == (Decimal("53"),) and number.part == part
+    assert number.covers(ReleaseNumber.scalar("53", part=part))
+    assert not number.covers(ReleaseNumber.scalar("53"))
+    assert not number.covers(ReleaseNumber.scalar("53", part=12))
+
+
 def test_extra_marker_and_digit_underscores_are_not_float_loss() -> None:
     policy = NumberPolicy()
 
@@ -188,3 +199,90 @@ def test_missing_release_report_rejects_invalid_limits_and_input_types() -> None
         detect_missing_releases((), max_expansion=0)
     with pytest.raises(TypeError, match="ReleaseNumber"):
         detect_missing_releases(("1",))  # type: ignore[arg-type]
+
+
+def test_incomplete_numeric_candidates_do_not_become_known_prefixes() -> None:
+    malformed = parse_release_number("Series v1.2.3.cbz", "volume", NumberPolicy())
+    precise = parse_release_number("Series v1.20.cbz", "volume", NumberPolicy())
+
+    assert malformed.kind == "missing"
+    assert precise.values == (Decimal("1.20"),)
+    assert precise.raw_tokens == ("1.20",)
+
+
+def test_ordered_keyword_cleanup_rejects_leftover_keyword_text() -> None:
+    short_first = NumberPolicy(
+        volume_keywords=("V", "Volumes?"),
+        chapter_keywords=("C", "Chapters?"),
+    )
+    long_first = NumberPolicy(
+        volume_keywords=("Volumes?", "V"),
+        chapter_keywords=("Chapters?", "C"),
+    )
+
+    assert parse_release_number("Series Volumes 2.cbz", "volume", short_first).kind == "missing"
+    assert parse_release_number("Series Chapters 3.cbz", "chapter", short_first).kind == "missing"
+    assert parse_release_number("Series Volumes 2.cbz", "volume", long_first).values == (
+        Decimal("2"),
+    )
+    assert parse_release_number("Series Chapters 3.cbz", "chapter", long_first).values == (
+        Decimal("3"),
+    )
+
+
+def test_descending_collection_covers_intermediate_volumes_but_explicit_set_does_not() -> None:
+    policy = NumberPolicy()
+    interval = parse_release_number("Series v3-1.cbz", "volume", policy)
+    fourth = parse_release_number("Series v4.cbz", "volume", policy)
+    explicit = parse_release_number("Series v3-1-4.cbz", "volume", policy)
+
+    assert interval.kind == "range"
+    assert interval.raw_tokens == ("1", "3")
+    assert interval.covers(ReleaseNumber.scalar("2"))
+    complete = detect_missing_releases((interval, fourth))
+    assert complete.status == "complete"
+    assert complete.observed == (1, 2, 3, 4)
+    assert complete.missing == ()
+
+    assert explicit.kind == "set"
+    assert explicit.raw_tokens == ("3", "1", "4")
+    assert not explicit.covers(ReleaseNumber.scalar("2"))
+    incomplete = detect_missing_releases((explicit,))
+    assert incomplete.status == "complete"
+    assert incomplete.observed == (1, 3, 4)
+    assert incomplete.missing == (2,)
+
+
+def test_descending_decimal_interval_retains_each_endpoint_precision() -> None:
+    interval = parse_release_number("Series v03.10-01.01.cbz", "volume", NumberPolicy())
+
+    assert interval.kind == "range"
+    assert interval.raw_tokens == ("01.01", "03.10")
+    assert interval.values[0].as_tuple() == Decimal("01.01").as_tuple()
+    assert interval.values[1].as_tuple() == Decimal("03.10").as_tuple()
+
+
+@pytest.mark.parametrize(
+    ("name", "kind", "tokens"),
+    [
+        ("Series v3-1_extra Part 12.cbz", "volume", ("1.5", "3")),
+        ("Series v1-3_extra Part 12.cbz", "volume", ("1", "3.5")),
+        ("Series v03.10-1_extra Part 12.cbz", "volume", ("1.5", "03.10")),
+        ("Series v01.01-3_extra Part 12.cbz", "volume", ("01.01", "3.5")),
+        ("Series c3-1_extrax12.cbz", "chapter", ("1.5", "3")),
+        ("Series c1-3_extra#12.cbz", "chapter", ("1", "3.5")),
+    ],
+)
+def test_extra_range_ordering_retains_endpoint_values_and_part_coverage(
+    name: str, kind: str, tokens: tuple[str, str]
+) -> None:
+    number = parse_release_number(name, kind, NumberPolicy())
+
+    assert number.kind == "range"
+    assert number.raw_tokens == tokens
+    assert number.values == (Decimal(tokens[0]), Decimal(tokens[1]))
+    assert number.part == 12
+    assert number.covers(ReleaseNumber.scalar("2", part=12))
+    assert not number.covers(ReleaseNumber.scalar("2", part=10))
+    assert not number.contains("0.9")
+    assert not number.contains("3.6")

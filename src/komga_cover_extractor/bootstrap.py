@@ -6,6 +6,7 @@ from typing import cast
 
 import regex
 
+from . import __version__
 from .application.pipeline import Pipeline, RunRequest
 from .application.rename_lists import DictionaryPolicy, load_dictionaries
 from .config import Configuration
@@ -150,7 +151,7 @@ def open_pipeline(config: Configuration, *, request: RunRequest | None = None) -
         parsing=parsing, renaming=rename_policy(config, numbers=parsing.number_policy,
                                                publishers=dictionaries.publishers),
         archive=archive, covers=cover_policy(config, archive),
-        series_artwork=series_cover_policy(config), policy_version=config.policy_fingerprint(),
+        series_artwork=series_cover_policy(config), policy_version=config.policy_fingerprint(rule_version=3),
         classification=matching.classification, matching=matching, ranking=ranking_policy(config),
         options=options, unacceptable_keywords=config.unacceptable_keywords,
         ignored_folder_names=config.ignored_folder_names, log_dir=config.log_dir,
@@ -207,6 +208,7 @@ def open_pipeline(config: Configuration, *, request: RunRequest | None = None) -
                     authorization=invocation.authorization, cancel=pipeline.cancel, before=before,
                     chapter_covers=config.output_chapter_covers_to_discord,
                     mute_rename=config.mute_discord_rename_notifications,
+                    version=f"v{__version__}",
                 )
             def check(releases: tuple[ReleaseSnapshot, ...], authorization: RunAuthorization) -> RunResult:
                 nonlocal bookwalker, discord
@@ -247,6 +249,7 @@ def open_pipeline(config: Configuration, *, request: RunRequest | None = None) -
                         return replace(result, decisions=(*result.decisions, Decision(error.status, error.reason)))
                 return settle_bookwalker_deliveries(
                     result, state=state, discord=discord, authorization=authorization, cancel=pipeline.cancel,
+                    version=f"v{__version__}",
                     journal_ready=lambda: TransactionExecutor(config.state_dir, tuple(root.path for root in pipeline.roots),
                         cancel=pipeline.cancel).prepare_state_root(
                             authorization=RunAuthorization(apply=authorization.allow_remote)),

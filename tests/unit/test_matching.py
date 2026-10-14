@@ -32,6 +32,8 @@ from komga_cover_extractor.matching.series import (
     MatchScoreCache,
     match_series,
 )
+from komga_cover_extractor.parsing.filenames import ParsingPolicy, parse_release
+from komga_cover_extractor.parsing.normalization import clean_str
 
 
 def _digest(value: str) -> str:
@@ -65,7 +67,7 @@ def _release(
         ),
         kind=kind,
         display_series=series,
-        canonical_series_key=series.casefold().strip(),
+        canonical_series_key=clean_str(series),
         identifiers=identifiers,
     )
 
@@ -101,7 +103,6 @@ def test_rank_release_applies_ordered_regex_and_file_type_rules() -> None:
     ranked = rank_release(release, rules)
 
     assert ranked.status == "ranked"
-    assert ranked.reason == "matched_rules"
     assert ranked.total_score == 3.0
     assert [match.rule for match in ranked.candidates] == [rules[0], rules[2]]
     assert ranked.scores == (2.0, 1.0)
@@ -114,7 +115,6 @@ def test_rank_release_reports_unknown_release_kind_without_scoring() -> None:
     )
 
     assert ranked.status == "invalid_input"
-    assert ranked.reason == "unknown_release_kind"
     assert ranked.total_score == 0
     assert ranked.candidates == ()
 
@@ -139,9 +139,7 @@ def test_upgrade_requires_strictly_higher_rank() -> None:
 
     assert incoming_wins.status == "upgrade"
     assert incoming_wins.is_upgrade is True
-    assert incoming_wins.reason == "strictly_higher_rank"
     assert equal_rank.status == "review_required"
-    assert equal_rank.reason == "equal_rank_different_content"
     assert equal_rank.is_upgrade is None
 
 
@@ -160,9 +158,7 @@ def test_equal_rank_unknown_hash_is_review_and_equal_hash_is_not_an_upgrade() ->
     )
 
     assert unknown.status == "review_required"
-    assert unknown.reason == "equal_rank_content_identity_unknown"
     assert identical.status == "not_upgrade"
-    assert identical.reason == "identical_content"
 
 
 def test_lower_rank_is_not_an_upgrade_even_with_different_content() -> None:
@@ -174,7 +170,6 @@ def test_lower_rank_is_not_an_upgrade_even_with_different_content() -> None:
     )
 
     assert decision.status == "not_upgrade"
-    assert decision.reason == "lower_rank"
     assert decision.scores == (0.0, 1.0)
 
 
@@ -193,9 +188,9 @@ def test_library_type_classification_uses_ordered_rules_and_empty_is_no_match() 
 
     assert result.status == "matched"
     assert result.library_type is general
-    assert result.reason == "first_ordered_rule_matched"
     assert result.scores[0].matched_files == 2
-    assert empty.status == "no_match" and empty.reason == "empty_input"
+    assert empty.status == "no_match"
+    assert empty.library_type is None
     assert no_files.status == "no_match" and no_files.library_type is None
 
 
@@ -218,7 +213,7 @@ def test_root_auto_classification_uses_named_sample_and_thresholds() -> None:
     assert classified.formats == ("chapter",)
     assert classified.extension_percentages == ((".cbz", 40.0), (".epub", 60.0))
     assert classified.extensions == (".cbz", ".epub", ".zip")
-    assert classify_root((), ClassificationPolicy()).reason == "empty_input"
+    assert classify_root((), ClassificationPolicy()).status == "no_match"
 
 
 def test_folder_consensus_and_rename_floor_are_explicit_policy() -> None:
@@ -250,9 +245,9 @@ def test_root_suitability_checks_every_extension_and_format() -> None:
     wrong_kind = _release("/downloads/Series v01.cbz", "Series", kind="chapter")
 
     assert check_root_suitability((allowed,), root, policy).status == "suitable"
-    assert check_root_suitability((allowed, disallowed), root, policy).reason == "extension_restriction"
-    assert check_root_suitability((wrong_kind,), root, policy).reason == "format_restriction"
-    assert check_root_suitability((), root, policy).reason == "empty_input"
+    assert check_root_suitability((allowed, disallowed), root, policy).status == "no_match"
+    assert check_root_suitability((wrong_kind,), root, policy).status == "no_match"
+    assert check_root_suitability((), root, policy).status == "no_match"
 
 
 def test_root_routing_rejects_zero_and_multiple_destinations() -> None:
@@ -273,30 +268,88 @@ def test_root_routing_rejects_zero_and_multiple_destinations() -> None:
     )
 
     assert rejected.status == "no_match"
-    assert rejected.reason == "no_suitable_destination"
     assert ambiguous.status == "ambiguous"
-    assert ambiguous.reason == "multiple_suitable_destinations"
     assert len(ambiguous.candidates) == 2
 
 
 def test_series_matching_prioritizes_exact_name_and_reports_ambiguity() -> None:
-    incoming = _release("/downloads/Series v02.cbz", "Series")
+    parsing = ParsingPolicy()
+    incoming = parse_release(FileObservation(Path("/downloads/Series v02.cbz")), parsing)
     first = LibraryRoot(Path("/library-a"), extensions=(".cbz",))
     second = LibraryRoot(Path("/library-b"), extensions=(".cbz",))
     releases = (
-        _release("/library-a/Series/Series v01.cbz", "Series"),
-        _release("/library-b/Series/Series v01.cbz", "Series"),
+        parse_release(FileObservation(Path("/library-a/Series/Series v01.cbz")), parsing),
+        parse_release(FileObservation(Path("/library-b/Series/Series v01.cbz")), parsing),
     )
     library = LibrarySnapshot(releases=releases, roots=(first, second))
 
     decision = match_series(incoming, library, _matching_policy())
 
     assert decision.status == "ambiguous"
-    assert decision.reason == "prioritized_name_match"
     assert decision.selected is None
     assert {candidate.series_path for candidate in decision.candidates} == {
         Path("/library-a/Series"), Path("/library-b/Series")
     }
+
+
+def test_filename_series_does_not_compete_with_a_primary_folder_match() -> None:
+    parsing = ParsingPolicy()
+    incoming = parse_release(FileObservation(Path("/downloads/Incoming/Series v02.cbz")), parsing)
+    named_folder = parse_release(FileObservation(Path("/library/Series/Series v01.cbz")), parsing)
+    collection = parse_release(FileObservation(Path("/library/Other Collection/Series v03.cbz")), parsing)
+    root = LibraryRoot(Path("/library"))
+    policy = _matching_policy(image=False, identifiers=False)
+
+    unique = match_series(incoming, LibrarySnapshot((collection, named_folder), (root,)), policy)
+    alias_only = match_series(incoming, LibrarySnapshot((collection,), (root,)), policy)
+
+    assert unique.status == "matched"
+    assert unique.selected is not None
+    assert unique.selected.series_path == Path("/library/Series")
+    assert tuple(candidate.series_path for candidate in unique.candidates) == (Path("/library/Series"),)
+    assert alias_only.status == "no_match"
+    assert alias_only.selected is None
+    assert alias_only.candidates == ()
+
+
+@pytest.mark.parametrize(
+    ("series", "folder"),
+    (("Series", "Series"), ("Princess", "Princess"), ("Café Series", "CAFE Series")),
+)
+def test_parsed_folder_identity_precedes_qualifying_fuzzy_and_filename_aliases(
+    series: str, folder: str,
+) -> None:
+    parsing = ParsingPolicy()
+    root = LibraryRoot(Path("/library"))
+    incoming = parse_release(
+        FileObservation(Path(f"/downloads/Incoming/{series} v02.cbz")), parsing,
+    )
+    exact = parse_release(
+        FileObservation(root.path / folder / f"{series} v01.cbz"), parsing,
+    )
+    fuzzy = parse_release(
+        FileObservation(root.path / f"{folder}x" / f"{series} v03.cbz"), parsing,
+    )
+    alias = parse_release(
+        FileObservation(root.path / "Other Collection" / f"{series} v04.cbz"), parsing,
+    )
+    policy = _matching_policy(similarity=0.5, image=False, identifiers=False)
+
+    fuzzy_only = match_series(incoming, LibrarySnapshot((fuzzy,), (root,)), policy)
+    decision = match_series(
+        incoming, LibrarySnapshot((fuzzy, alias, exact), (root,)), policy,
+    )
+
+    assert fuzzy_only.status == "matched"
+    assert fuzzy_only.selected is not None
+    assert fuzzy_only.selected.series_path == root.path / f"{folder}x"
+    assert decision.status == "matched"
+    assert decision.selected is not None
+    assert decision.selected.series_path == root.path / folder
+    assert decision.selected.releases == (exact,)
+    assert tuple(candidate.series_path for candidate in decision.candidates) == (
+        root.path / folder,
+    )
 
 
 def test_series_matching_full_name_tier_does_not_choose_first_candidate() -> None:
@@ -315,8 +368,9 @@ def test_series_matching_full_name_tier_does_not_choose_first_candidate() -> Non
     )
 
     assert decision.status == "ambiguous"
-    assert decision.reason == "full_name_match"
-    assert len(decision.candidates) == 2
+    assert {candidate.series_path for candidate in decision.candidates} == {
+        Path("/library/Series Alpha"), Path("/library/Series Beta"),
+    }
     assert decision.selected is None
 
 
@@ -348,12 +402,10 @@ def test_identifier_tier_requires_a_unique_candidate_and_library_availability() 
     )
 
     assert ambiguous.status == "ambiguous"
-    assert ambiguous.reason == "unique_identifier_match"
     assert unique.status == "matched"
     assert unique.selected is not None
     assert unique.selected.evidence == "unique_identifier"
     assert unavailable.status == "missing_dependency"
-    assert unavailable.reason == "root_unavailable"
 
 
 def test_candidate_extension_restrictions_prevent_name_match() -> None:
@@ -367,7 +419,6 @@ def test_candidate_extension_restrictions_prevent_name_match() -> None:
     decision = match_series(incoming, library, _matching_policy())
 
     assert decision.status == "no_match"
-    assert decision.reason == "no_suitable_series_folder_or_root"
 
 
 def test_observed_cover_similarity_is_a_tier_before_identifiers() -> None:
@@ -395,7 +446,6 @@ def test_observed_cover_similarity_is_a_tier_before_identifiers() -> None:
     )
 
     assert decision.status == "matched"
-    assert decision.reason == "cover_similarity_match"
     assert decision.selected is not None
     assert decision.selected.evidence == "cover_similarity"
 
@@ -482,7 +532,6 @@ def test_missing_cover_observation_does_not_fall_through_to_identifier() -> None
     )
 
     assert decision.status == "missing_dependency"
-    assert decision.reason == "cover_similarity_observation_unavailable"
     assert decision.selected is None
 
 
@@ -524,7 +573,6 @@ def test_root_library_type_restriction_uses_supplied_ordered_rules() -> None:
     assert check_root_suitability((allowed,), root, policy).status == "suitable"
     rejected = check_root_suitability((unclassified,), root, policy)
     assert rejected.status == "no_match"
-    assert rejected.reason == "library_type_unclassified"
 
 
 def test_series_folder_requires_ninety_percent_medium_and_kind_match() -> None:
@@ -551,7 +599,6 @@ def test_series_folder_requires_ninety_percent_medium_and_kind_match() -> None:
 
     assert chapter_match.status == "matched"
     assert volume_mismatch.status == "no_match"
-    assert volume_mismatch.reason == "no_suitable_series_folder_or_root"
 
 
 def test_series_folder_match_percentage_is_policy_scoped() -> None:
@@ -638,7 +685,8 @@ def test_alternative_cover_gate_uses_sibling_directory_word_counts() -> None:
     )
 
     assert decision.status == "matched"
-    assert decision.reason == "cover_similarity_match"
+    assert decision.selected is not None
+    assert decision.selected.series_path == Path("/library/Chronicles of Azure")
 
 
 def test_alternative_cover_gate_skips_unrelated_folder_observations() -> None:

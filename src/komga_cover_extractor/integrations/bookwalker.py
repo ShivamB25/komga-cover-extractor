@@ -410,9 +410,8 @@ def normalize_book_title(title: str, *, number_policy: NumberPolicy) -> tuple[st
 
 def _matches(title: str, query: str, threshold: float, *, allow_shortened: bool) -> bool:
     titles = (title, shortened_title(title)) if allow_shortened else (title,)
-    queries = (query, shortened_title(query)) if allow_shortened else (query,)
-    return any(similar(clean_str(candidate), clean_str(search)) >= threshold
-               for candidate in titles for search in queries if candidate and search)
+    return any(similar(clean_str(candidate), clean_str(query)) >= threshold
+               for candidate in titles if candidate and query)
 
 
 def group_bookwalker_books(books: Sequence[Book], *, required_similarity_score: float) -> tuple[tuple[Book, ...], ...]:

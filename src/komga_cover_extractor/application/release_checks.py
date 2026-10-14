@@ -25,10 +25,11 @@ _NOVEL_EXTENSIONS = frozenset((".epub",))
 
 def serialize_book(book: Book) -> dict[str, object]:
     number = book["number"]
+    serialized_number = number.to_dict()
     return {
-        "title": book["title"], "original_title": book["original_title"], "number": number.to_dict(),
+        "title": book["title"], "original_title": book["original_title"], "number": serialized_number,
         "volume_number": "-".join(number.raw_tokens) if number.kind != "set" else ", ".join(number.raw_tokens),
-        "part": number.part, "premium": book["premium"], "book_type": book["book_type"],
+        "part": serialized_number["part"], "premium": book["premium"], "book_type": book["book_type"],
         "url": book["url"], "thumbnail": book["thumbnail"],
         "date": book["date"].isoformat() if book["date"] is not None else None,
         "date_status": book["date_status"], "release_state": book["release_state"],

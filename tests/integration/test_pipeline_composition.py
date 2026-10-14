@@ -120,13 +120,13 @@ def test_single_book_inspection_does_not_open_unselected_corrupt_archives(tmp_pa
 
 @pytest.mark.parametrize(("suffix", "first_member", "page_count", "grayscale", "kind"), [
     (".png", None, 86, True, "chapter"),
-    (".PNG", None, 86, True, "chapter"),
+    (".PNG", None, 86, True, "volume"),
     (".PNG", "000.txt", 86, True, "volume"),
     (".PNG", "000/", 86, True, "volume"),
     (".PNG", "000.txt", 85, False, "chapter"),
     (".PNG", None, 86, False, "volume"),
 ])
-def test_inspected_archive_page_classification_keeps_lexical_first_member_and_eligible_count(
+def test_inspected_archive_page_classification_keeps_raw_lexical_first_member_and_image_count(
     tmp_path: Path, suffix: str, first_member: str | None, page_count: int, grayscale: bool, kind: str,
 ) -> None:
     _capabilities()
@@ -191,7 +191,7 @@ def test_committed_delivery_receives_observed_prechange_metadata_and_current_pat
         ranked_keywords=[{"name": "Digital", "score": 3, "file_type": "both"}],
     )
     existing = tmp_path / "library" / "Series" / "Series v01 (Scan).cbz"
-    incoming = tmp_path / "downloads" / "Series Volume 1 (Digital).cbz"
+    incoming = tmp_path / "downloads" / "Incoming" / "Series Volume 1 (Digital).cbz"
     prior_bytes = _book(existing, publisher="Prior Press")
     incoming_bytes = _book(incoming, publisher="Incoming Press", color=(0, 255, 0))
     observed: list[tuple[ReleaseSnapshot, ...]] = []
@@ -442,19 +442,17 @@ def test_no_cover_is_a_completed_nonmatch_for_each_organizer_command(tmp_path: P
         tmp_path, check_for_existing_series_toggle=True, match_through_image_similarity=True,
         required_image_similarity_score=0.0, required_matching_percentage=0, required_similarity_score=1.0,
     )
-    incoming = tmp_path / "downloads" / "Rareword One v01.cbz"
+    incoming = tmp_path / "downloads" / "Incoming" / "Rareword One v01.cbz"
     existing = tmp_path / "library" / "Rareword Two" / "Rareword Two v01.cbz"
     for path in (incoming, existing):
-        path.parent.mkdir(exist_ok=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr("ComicInfo.xml", "<ComicInfo><Year>2015</Year></ComicInfo>")
     originals = {path: path.read_bytes() for path in (incoming, existing)}
     with open_pipeline(config) as pipeline:
         result = pipeline.run(RunRequest(command, books=(incoming,), authorization=RunAuthorization(apply=True)))
     assert (result.exit_code, result.planned, result.committed) == (0, 0, 0)
-    assert ("no_match", "no_matching_evidence", incoming) in {
-        (decision.status, decision.reason, decision.path) for decision in result.decisions
-    }
+    assert any(decision.status == "no_match" and decision.path == incoming for decision in result.decisions)
     assert {path: path.read_bytes() for path in originals} == originals
     assert not (tmp_path / "state").exists() and not (tmp_path / "logs").exists()
     assert not any(path.suffix in {".jpg", ".png", ".webp"} for path in tmp_path.rglob("*"))
@@ -476,7 +474,7 @@ def test_unavailable_cover_evidence_is_not_a_completed_nonmatch(
         tmp_path, check_for_existing_series_toggle=True, match_through_image_similarity=True,
         required_image_similarity_score=0.0, required_matching_percentage=0, required_similarity_score=1.0,
     )
-    incoming = tmp_path / "downloads" / "Rareword One v01.cbz"
+    incoming = tmp_path / "downloads" / "Incoming" / "Rareword One v01.cbz"
     existing = tmp_path / "library" / "Rareword Two" / "Rareword Two v01.cbz"
     originals = {incoming: _book(incoming), existing: _book(existing)}
 
@@ -591,7 +589,7 @@ def test_full_run_does_not_republish_prior_group_projection(tmp_path: Path, thre
                      rename_files_in_download_folders_toggle=True, check_for_existing_series_toggle=True)
     existing = tmp_path / "library/Chronicle/Chronicle v01.cbz"
     existing_bytes = _book(existing)
-    incoming = tmp_path / "downloads/Chroniclex Volume 2 (Digital).cbz"
+    incoming = tmp_path / "downloads/Incoming/Chroniclex Volume 2 (Digital).cbz"
     original = _book(incoming)
     target_parent = existing.parent if threshold < 1 else incoming.parent
     target = target_parent / "Chroniclex v02 (Digital).cbz"

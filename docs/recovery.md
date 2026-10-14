@@ -31,6 +31,14 @@ Counts measure newly committed groups during the invocation. Completing an unfin
 
 The executor's staged-byte budget uses the configured conversion scratch allowance. Reservations include publication artifacts, replacement backups and retained move/quarantine sources; crossing the allowance is refused before creating state. Streaming additionally refuses source growth beyond observed length/cap before writing the excess chunk. A lowered budget may prevent an existing pending operation from continuing; preserve candidates and restore the intended limit before attempting recovery.
 
+## Watch readiness and replay
+
+Completed watch work and committed output artifacts retain exact-fingerprint, policy-scoped durable suppression. Restart does not republish unchanged completed books. Uncommitted waiting/ready observations restart their quiet window; old persisted readiness is not mutation authority. Completed peers reused as decision evidence are freshly sampled and checked against current fingerprints and downloader state.
+
+Growing or unfinished peers cannot authorize duplicate retirement. Sidecar and folder effects defer until their actual sources are ready, as do real multipart dependencies. Dependency waits do not consume archive-decoder retry attempts. Other decoder failures retain bounded retries. Active jobs, auxiliary samples, and readiness caches remain bounded; a mutation footprint that exceeds configured readiness capacity stays deferred rather than expanding authority or silently dropping participants.
+
+SIGINT/SIGTERM interrupts pending terminal approvals without requiring input and leaves uncommitted candidates intact. Retained originals, committed groups, and independent delivery obligations keep their existing recovery contracts.
+
 ## Tested and residual limits
 
 Linux x86_64/Python 3.14 temporary filesystems: process termination after publication/backup/group commit/cleanup boundaries, competing writer/recovery, no-clobber unsupported faults, file/directory flush faults, nested directory removal, retained copy independence, malformed schemas and hot-journal preview preservation have regression coverage. An actual `/tmp` to `/dev/shm` move exercised distinct devices; a separate test injects EXDEV semantics. Real CLI recovery also passed outside the checkout using the clean installed wheel, including occupied cyclic paths and connected delivery.

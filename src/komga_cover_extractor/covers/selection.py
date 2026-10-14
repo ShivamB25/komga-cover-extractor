@@ -57,7 +57,7 @@ class CoverPolicy:
             raise ValueError("cover_patterns must contain regular expressions")
         object.__setattr__(self, "cover_patterns", patterns)
         object.__setattr__(self, "compiled_patterns", tuple(regex.compile(pattern, regex.IGNORECASE) for pattern in patterns))
-        encoded = json.dumps({"rule_version": 1, "policy": self.as_dict()},
+        encoded = json.dumps({"rule_version": 2, "policy": self.as_dict()},
                              sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         object.__setattr__(self, "generation_fingerprint", sha256(encoded).hexdigest())
 
@@ -127,12 +127,12 @@ class CoverSelection:
 
 
 def image_members(members: Sequence[ArchiveMember]) -> tuple[str, ...]:
-    return tuple(sorted(
-        member.name for member in members
+    return tuple(
+        member.name for member in sorted(members, key=lambda item: item.raw_name)
         if not member.is_dir
         and PurePosixPath(member.name).suffix.lower() in IMAGE_SUFFIXES
         and not PurePosixPath(member.name).name.startswith((".", "__"))
-    ))
+    )
 
 
 def select_cover_candidates(
@@ -145,6 +145,7 @@ def select_cover_candidates(
     if len(candidates) > policy.archive_policy.cover_max_candidates:
         return CoverSelection("invalid_input", "cover_candidate_limit")
     diagnostics: tuple[str, ...] = ()
+    authoritative: str | None = None
     if is_epub and reference is not None:
         if reference.status == "ambiguous":
             return CoverSelection("ambiguous", reference.reason)
@@ -157,10 +158,13 @@ def select_cover_candidates(
                 return CoverSelection("unsupported", "svg_cover_unsupported")
             if reference.member not in candidates:
                 return CoverSelection("invalid_input", "unusable_epub_cover_member")
-            return CoverSelection("valid", "authoritative_epub_cover", (reference.member,))
+            if not policy.compare_detected_cover_to_blank_images:
+                return CoverSelection("valid", "authoritative_epub_cover", (reference.member,))
+            authoritative = reference.member
+            candidates = tuple(name for name in candidates if name != authoritative)
         if reference.status in {"absent", "invalid"}:
             diagnostics = (reference.reason, "epub_image_fallback")
-    if not candidates:
+    if not candidates and authoritative is None:
         return CoverSelection("absent", "no_cover_images", diagnostics=diagnostics)
     if not is_epub:
         return CoverSelection("valid", "lexical_comic_page", candidates, diagnostics)
@@ -179,4 +183,7 @@ def select_cover_candidates(
                 ordered.append(name)
                 seen.add(name)
     ordered.extend(name for name in candidates if name not in seen)
+    if authoritative is not None:
+        return CoverSelection("valid", "authoritative_epub_cover", (authoritative,) + tuple(ordered),
+                              diagnostics, ((authoritative,),) + tuple(groups), candidates)
     return CoverSelection("valid", "ordered_epub_fallback", tuple(ordered), diagnostics, tuple(groups), candidates)

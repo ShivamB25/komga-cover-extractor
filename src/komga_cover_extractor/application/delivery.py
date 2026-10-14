@@ -285,7 +285,7 @@ def _notifications(
     roots: tuple[LibraryRoot, ...], parsing: ParsingPolicy, ranking: RankingPolicy,
     before: Mapping[Path, ReleaseSnapshot], after: Mapping[Path, ReleaseSnapshot],
     match_decisions: Mapping[Path, Decision],
-    chapter_covers: bool, mute_rename: bool,
+    chapter_covers: bool, group_chapters: bool, mute_rename: bool,
 ) -> Iterator[tuple[str, dict[str, object], ReleaseSnapshot | None]]:
     retired: list[tuple[dict[str, object], ReleaseSnapshot]] = []
     for operation in operations:
@@ -404,9 +404,9 @@ def _notifications(
                 chapters.append(release)
             else:
                 yield "new_release", format_release_notification(release), release
-    if chapter_covers:
+    if chapter_covers or not group_chapters:
         for release in sorted(chapters, key=lambda item: (item.display_series, min(item.number.values, default=Decimal(0)), item.number.part or 0, item.name)):
-            yield "new_release", format_release_notification(release), release
+            yield "new_release", format_release_notification(release), release if chapter_covers else None
     else:
         for embed in group_chapter_notifications(chapters):
             yield "new_release", embed, None
@@ -631,6 +631,7 @@ def settle_committed_deliveries(
                         items = _notifications(operations, state=state, operation_id=event.operation_id, roots=roots,
                                                parsing=parsing, ranking=ranking, before=known_before, after=known_after,
                                                chapter_covers=chapter_covers, mute_rename=mute_rename,
+                                               group_chapters="discord/new-release" in discord.channel_keys,
                                                match_decisions=match_decisions)
                         _enqueue_notifications(items, state=state, operation_id=event.operation_id, member_id=anchor,
                                                scope=scope, discord=discord, cover_policy=cover_policy, roots=roots,

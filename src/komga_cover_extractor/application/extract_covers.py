@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 from threading import Event
 from typing import Literal, cast
 
-from ..covers.selection import CoverPolicy, select_cover_candidates
+from ..covers.selection import IMAGE_SUFFIXES, CoverPolicy, select_cover_candidates
 from ..domain.operations import ArtifactSpec
 from ..domain.releases import ArchivePageObservation
 from ..infrastructure.filesystem import FilesystemError, checked_path
@@ -108,16 +108,22 @@ def cover_job(request: dict[str, object]) -> dict[str, object]:
         raise WorkerError("native_cover_requires_conversion", "unsupported")
     output = ByteOutputPolicy() if output_value == "bytes" else FileOutputPolicy()
     with ArchiveReader(book, policy.archive_policy) as reader:
-        members = reader.members()
+        members = tuple(sorted(reader.members(), key=lambda item: item.raw_name))
         metadata = read_book_metadata(reader)
         reference = resolve_epub_cover(reader) if container == "epub" else None
         selection = select_cover_candidates(members, policy=policy, is_epub=container == "epub", reference=reference, release_kind=release_kind)
-        pages = tuple(ArchivePageObservation(member.name, is_directory=member.is_dir) for member in sorted(members, key=lambda item: item.raw_name))
+        pages = tuple(ArchivePageObservation(member.raw_name, is_directory=member.is_dir) for member in members)
         diagnostics = selection.diagnostics + ((metadata.reason,) if metadata.status == "invalid" else ())
         if selection.status == "absent":
             return _wire_result(status="absent", reason=selection.reason, metadata=metadata, pages=pages, diagnostics=diagnostics, container=container)
         if selection.status != "valid":
             raise WorkerError(selection.reason, "unsupported" if selection.status == "unsupported" else "review_required" if selection.status == "ambiguous" else "invalid_input")
+        first_data = None
+        first_observation = None
+        if container != "epub" and members and not members[0].is_dir and PurePosixPath(members[0].raw_name).suffix in IMAGE_SUFFIXES:
+            first_data = reader.read_member(members[0].name, max_bytes=policy.archive_policy.cover_member_max_bytes)
+            first_observation = observe_image(first_data, max_pixels=policy.archive_policy.image_max_pixels)
+            pages = (ArchivePageObservation(pages[0].name, first_observation.is_grayscale),) + pages[1:]
         blanks = load_blank_references() if policy.compare_detected_cover_to_blank_images else None
         blank_members: set[str] = set()
         groups = selection.pattern_groups + (selection.fallback_candidates or selection.candidates,)
@@ -128,18 +134,20 @@ def cover_job(request: dict[str, object]) -> dict[str, object]:
                     if pattern_pass:
                         break
                     continue
-                raw = reader.read_member(member, max_bytes=policy.archive_policy.cover_member_max_bytes)
+                raw = first_data if members and member == members[0].name and first_data is not None else reader.read_member(member, max_bytes=policy.archive_policy.cover_member_max_bytes)
                 if blanks is not None:
                     comparison = compare_to_blank(raw, required_score=policy.blank_cover_required_similarity_score, max_pixels=policy.archive_policy.image_max_pixels, references=blanks)
                     if comparison.status == "matched":
                         blank_members.add(member)
                         diagnostics += ("blank_cover_skipped",)
+                        if reference is not None and reference.status == "found" and member == reference.member:
+                            diagnostics += ("epub_image_fallback",)
                         if pattern_pass:
                             break
                         continue
                     if comparison.status != "no_match":
                         raise WorkerError(comparison.reason, comparison.status)
-                observation = observe_image(raw, max_pixels=policy.archive_policy.image_max_pixels)
+                observation = first_observation if members and member == members[0].name and first_observation is not None else observe_image(raw, max_pixels=policy.archive_policy.image_max_pixels)
                 encoded = encode_image(
                     raw, source_suffix=PurePosixPath(member).suffix, output=output,
                     output_covers_as_webp=policy.output_covers_as_webp,
@@ -148,10 +156,10 @@ def cover_job(request: dict[str, object]) -> dict[str, object]:
                     max_pixels=policy.archive_policy.image_max_pixels,
                     max_bytes=policy.archive_policy.cover_member_max_bytes,
                 )
-                pages = tuple(ArchivePageObservation(page.name, observation.is_grayscale if page.name == member else None, page.is_directory) for page in pages)
+                pages = tuple(ArchivePageObservation(page.name, observation.is_grayscale if validate_member_name(page.name) == member else page.is_grayscale, page.is_directory) for page in pages)
                 reader.assert_unchanged()
                 return _wire_result(
-                    status="valid", reason=selection.reason, metadata=metadata, pages=pages,
+                    status="valid", reason="ordered_epub_fallback" if reference is not None and reference.status == "found" and member != reference.member else selection.reason, metadata=metadata, pages=pages,
                     diagnostics=diagnostics, container=container, selected_member=member,
                     encoded=encoded.data, image_format=encoded.format, media_type=encoded.media_type, suffix=encoded.suffix,
                 )
@@ -183,8 +191,8 @@ def _decode_result(response: Mapping[str, object], *, policy: CoverPolicy, outpu
     for page in raw_pages:
         if not isinstance(page, dict) or set(page) != {"name", "is_grayscale", "is_directory"} or not isinstance(page["name"], str) or type(page["is_directory"]) is not bool or (page["is_grayscale"] is not None and type(page["is_grayscale"]) is not bool):
             raise WorkerError("invalid_cover_worker_pages", "failed")
-        name = validate_member_name(page["name"])
-        pages.append(ArchivePageObservation(name, page["is_grayscale"], page["is_directory"]))
+        validate_member_name(page["name"])
+        pages.append(ArchivePageObservation(page["name"], page["is_grayscale"], page["is_directory"]))
     diagnostics = tuple(cast(list[str], raw_diagnostics))
     if status == "absent":
         if any(response[name] is not None for name in ("selected_member", "format", "media_type", "suffix", "data_base64", "data_sha256")):
@@ -195,7 +203,7 @@ def _decode_result(response: Mapping[str, object], *, policy: CoverPolicy, outpu
     if not isinstance(member, str) or not isinstance(image_format, str) or image_format not in _IMAGE_DETAILS or not isinstance(base64_data, str) or not isinstance(digest, str):
         raise WorkerError("invalid_cover_worker_image", "failed")
     member = validate_member_name(member)
-    if member not in {page.name for page in pages if not page.is_directory}:
+    if member not in {validate_member_name(page.name) for page in pages if not page.is_directory}:
         raise WorkerError("invalid_cover_worker_image", "failed")
     media_type, suffix = _IMAGE_DETAILS[image_format]
     if response["media_type"] != media_type or response["suffix"] != suffix or len(base64_data) > ((policy.archive_policy.cover_member_max_bytes + 2) // 3) * 4:

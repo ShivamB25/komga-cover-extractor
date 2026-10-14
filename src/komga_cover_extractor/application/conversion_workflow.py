@@ -36,7 +36,9 @@ from ..infrastructure.state import StateStore, StateStoreError
 from ..infrastructure.transactions import TransactionExecutor
 from ..infrastructure.workers import WorkerError
 from ..infrastructure.zip_archive import ArchivePolicy
+from ..parsing.filenames import ParsingPolicy
 from .convert import ConversionResult, HeaderObservation, convert_book, observe_header
+from .planning import read_interactive_line
 
 ArtifactPurpose = Literal["informational", "publication"]
 _MARKER = ".owner.json"
@@ -347,13 +349,13 @@ def _existing_destination(header: HeaderObservation) -> FileFingerprint | None:
     return fingerprint(path, header.source.root)
 
 
-def _choose_replacement(path: Path, *, interactive: bool) -> bool:
+def _choose_replacement(path: Path, *, interactive: bool, cancel: Event) -> bool:
     if not interactive or not sys.stdin.isatty() or not sys.stderr.isatty():
         return False
     sys.stderr.write(f"Replace {str(path)!r} and retain its previous bytes? Type replace to authorize, or keep: ")
     sys.stderr.flush()
     try:
-        return sys.stdin.readline().strip().lower() == "replace"
+        return read_interactive_line(cancel, bytearray()) == "replace"
     except KeyboardInterrupt:
         raise _WorkflowError("cancelled", "interactive_choice_cancelled", path) from None
 
@@ -381,7 +383,8 @@ def _error_decision(error: _WorkflowError | WorkerError | OSError | StateStoreEr
 def convert_releases(
     selected: Sequence[ReleaseSnapshot], *, roots: tuple[LibraryRoot, ...], archive_policy: ArchivePolicy,
     state_dir: Path, policy_version: str, authorization: RunAuthorization, cancel: Event,
-    interactive: bool = False,
+    interactive: bool = False, parsing: ParsingPolicy | None = None,
+    manual_rename: bool = False, rename_zip_to_cbz: bool = True,
 ) -> RunResult:
     """The focused convert service. Preview artifacts are never executable saved plans."""
     decisions: list[Decision] = []
@@ -396,6 +399,8 @@ def convert_releases(
     if not roots:
         return RunResult((Decision("invalid_input", "no_selected_roots"),))
     seen: set[Path] = set()
+    zip_renames: list[ReleaseSnapshot] = []
+    observations: dict[Path, HeaderObservation] = {}
     for release in selected:
         if release.path in seen:
             continue
@@ -411,7 +416,10 @@ def convert_releases(
             header = observe_header(source.path, root=root.path, policy=archive_policy, cancel=cancel)
             if header.source != source:
                 raise _WorkflowError("stale_plan", "source_fingerprint_changed", source.path)
-            if header.container in {"zip", "epub"}:
+            observations[source.path] = header
+            if header.container == "zip" and source.path.suffix.lower() == ".zip" and rename_zip_to_cbz:
+                zip_renames.append(release)
+            elif header.container in {"zip", "epub"}:
                 decisions.append(Decision("skipped", "already_zip_container" if header.container == "zip"
                                           else "epub_not_converted", source.path))
                 skipped += 1
@@ -425,6 +433,18 @@ def convert_releases(
             failed += int(decision.status in {"failed", "permission_denied", "publication_failed"})
             if decision.status == "cancelled":
                 break
+    if zip_renames and not cancel.is_set():
+        from .header_correction import correct_headers
+        renamed = correct_headers(
+            zip_renames, roots=roots, parsing=parsing or ParsingPolicy(), archive_policy=archive_policy,
+            state_dir=state_dir, policy_version=policy_version, authorization=authorization,
+            cancel=cancel, interactive=interactive, manual_rename=manual_rename, zip_only=True, observations=observations,
+        )
+        decisions.extend(renamed.decisions)
+        reports.extend(PlanReport(plan) for plan in renamed.plans)
+        committed += renamed.committed
+        skipped += renamed.skipped
+        failed += renamed.failed
     destinations: dict[Path, list[HeaderObservation]] = {}
     for header in headers:
         destinations.setdefault(header.source.path.with_suffix(".cbz"), []).append(header)
@@ -462,7 +482,7 @@ def convert_releases(
                                                   (before.sha256,)))
                         skipped += 1
                         continue
-                replace_existing = _choose_replacement(destination, interactive=interactive)
+                replace_existing = _choose_replacement(destination, interactive=interactive, cancel=cancel)
                 if not replace_existing:
                     decisions.append(Decision("conflict", "conversion_destination_exists", source.path,
                                               (str(destination), before.sha256)))

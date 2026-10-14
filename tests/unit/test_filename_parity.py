@@ -640,14 +640,6 @@ def test_render_parse_render_keeps_parts_sets_raw_decimals_and_extra_markers(
     assert render_release(reparsed, renderer) == rendered
 
 
-@pytest.mark.parametrize(("kind", "name"), [("volume", "Series v01 Part 1.5.cbz"), ("chapter", "Series c001x1.5.cbz")])
-def test_fractional_parts_are_invalid_instead_of_truncated(kind: str, name: str) -> None:
-    with pytest.raises(ValueError):
-        parse_release_number(name, kind, NumberPolicy())
-
-    assert parse_release_number("Series c001x12.cbz", "chapter", NumberPolicy()).part == 12
-
-
 def test_missing_volume_number_with_extra_marker_leaves_the_filename_unchanged() -> None:
     release = parse_release(observed("Series v2022_extra.cbz"), ParsingPolicy())
 
@@ -683,3 +675,226 @@ def test_volume_classification_preserves_the_broader_legacy_keyword_grammar() ->
     assert release.number.kind == "missing"
     assert release.display_series == "Series"
     assert render_release(release, RenamePolicy()) == "Series v-1 (Digital).cbz"
+
+
+def test_failed_complete_chapter_number_leaves_the_observed_filename_unchanged() -> None:
+    name = (
+        "Where to Go in a Whole Other World 024 - 4- A Little Shrine in a "
+        "Whole Other World (2021) (Digital) (AntsyLich).cbz"
+    )
+    rejected = parse_release(observed(name), ParsingPolicy(chapter_support_toggle=True))
+    accepted = parse_release(
+        observed("Series c4.cbz"), ParsingPolicy(chapter_support_toggle=True)
+    )
+    renderer = RenamePolicy(rename_chapters_with_preferred_chapter_keyword=True)
+
+    assert rejected.kind == "chapter"
+    assert rejected.number.kind == "missing"
+    assert render_release(rejected, renderer) == name
+    assert render_release(accepted, renderer) == "Series c004.cbz"
+
+
+@pytest.mark.parametrize("name", ["Series c001-003.cbz", "Series c1-3.cbz"])
+def test_chapter_collection_render_replaces_the_whole_numeric_sequence(name: str) -> None:
+    policy = ParsingPolicy(chapter_support_toggle=True)
+    renderer = RenamePolicy(rename_chapters_with_preferred_chapter_keyword=True)
+    release = parse_release(observed(name), policy)
+    rendered = render_release(release, renderer)
+
+    assert release.kind == "chapter"
+    assert release.number.kind == "range"
+    assert release.number.values == (Decimal("1"), Decimal("3"))
+    assert rendered == "Series c001-003.cbz"
+    assert render_release(parse_release(observed(rendered), policy), renderer) == (
+        "Series c001-003.cbz"
+    )
+
+
+def test_keywordless_chapter_collection_keeps_the_extension_out_of_the_number() -> None:
+    release = parse_release(observed("Series 1-3.cbz"), ParsingPolicy())
+
+    assert release.number.kind == "range"
+    assert release.number.raw_tokens == ("1", "3")
+    assert render_release(
+        release, RenamePolicy(rename_chapters_with_preferred_chapter_keyword=True)
+    ) == "Series c001-003.cbz"
+
+
+def test_descending_collection_render_orders_complete_endpoints_without_float_loss() -> None:
+    integral = parse_release(observed("Series v3-1.cbz"), ParsingPolicy())
+    fractional = parse_release(observed("Series v03.10-01.01.cbz"), ParsingPolicy())
+
+    assert render_release(integral, RenamePolicy()) == "Series v01-03.cbz"
+    assert render_release(fractional, RenamePolicy()) == "Series v01.01-03.10.cbz"
+
+
+@pytest.mark.parametrize("restructure", [False, True])
+@pytest.mark.parametrize(
+    ("name", "kind", "part", "bounds", "preserved", "restructured"),
+    [
+        (
+            "Series v3-1_extra Part 12.cbz",
+            "volume",
+            12,
+            ("1.5", "3"),
+            "Series v01_extra-03 Part 12.cbz",
+            "Series v01_extra-03 (Part 12).cbz",
+        ),
+        (
+            "Series v1-3_extra Part 10.cbz",
+            "volume",
+            10,
+            ("1", "3.5"),
+            "Series v01-03_extra Part 10.cbz",
+            "Series v01-03_extra (Part 10).cbz",
+        ),
+        (
+            "Series v03.10-1_extra Part 12.cbz",
+            "volume",
+            12,
+            ("1.5", "3.10"),
+            "Series v01_extra-03.10 Part 12.cbz",
+            "Series v01_extra-03.10 (Part 12).cbz",
+        ),
+        (
+            "Series c3-1_extrax12.cbz",
+            "chapter",
+            12,
+            ("1.5", "3"),
+            "Series c001_extra-003x12.cbz",
+            "Series c001_extra-003x12.cbz",
+        ),
+        (
+            "Series c1-3_extra#10.cbz",
+            "chapter",
+            10,
+            ("1", "3.5"),
+            "Series c001-003_extra#10.cbz",
+            "Series c001-003_extra#10.cbz",
+        ),
+        (
+            "Series c03.10-1_extrax12.cbz",
+            "chapter",
+            12,
+            ("1.5", "3.10"),
+            "Series c001_extra-03.10x12.cbz",
+            "Series c001_extra-03.10x12.cbz",
+        ),
+    ],
+)
+def test_extra_range_roundtrip_retains_positive_volume_and_chapter_parts(
+    restructure: bool,
+    name: str,
+    kind: str,
+    part: int,
+    bounds: tuple[str, str],
+    preserved: str,
+    restructured: str,
+) -> None:
+    policy = ParsingPolicy()
+    renderer = RenamePolicy(
+        restructure_when_renaming=restructure,
+        rename_chapters_with_preferred_chapter_keyword=True,
+    )
+    release = parse_release(observed(name), policy)
+    rendered = render_release(release, renderer)
+    reparsed = parse_release(observed(rendered), policy)
+
+    assert rendered == (restructured if restructure else preserved)
+    for snapshot in (release, reparsed):
+        assert snapshot.kind == kind
+        assert snapshot.number.kind == "range"
+        assert snapshot.number.values == (Decimal(bounds[0]), Decimal(bounds[1]))
+        assert snapshot.number.part == part
+        assert "filename:extra_marker" in snapshot.provenance
+    assert release.number.covers(reparsed.number)
+    assert reparsed.number.covers(release.number)
+    assert render_release(reparsed, renderer) == rendered
+
+
+@pytest.mark.parametrize("restructure", [False, True])
+@pytest.mark.parametrize(
+    ("name", "rendered", "bounds"),
+    [
+        (
+            "Series v3-1_extra.cbz",
+            "Series v01_extra-03 #01-03.cbz",
+            ("1.5", "3"),
+        ),
+        (
+            "Series v1-3_extra.cbz",
+            "Series v01-03_extra #01-03.cbz",
+            ("1", "3.5"),
+        ),
+    ],
+)
+def test_extra_range_issue_number_does_not_reassign_or_duplicate_the_marker(
+    restructure: bool, name: str, rendered: str, bounds: tuple[str, str]
+) -> None:
+    policy = ParsingPolicy()
+    renderer = RenamePolicy(
+        restructure_when_renaming=restructure,
+        add_issue_number_to_manga_file_name=True,
+    )
+    release = parse_release(observed(name), policy)
+    first = render_release(release, renderer)
+    reparsed = parse_release(observed(first), policy)
+
+    assert first == rendered
+    assert reparsed.number.kind == "range"
+    assert reparsed.number.values == (Decimal(bounds[0]), Decimal(bounds[1]))
+    assert "filename:extra_marker" in reparsed.provenance
+    assert render_release(reparsed, renderer) == rendered
+
+
+@pytest.mark.parametrize(
+    ("name", "extra", "rendered"),
+    [
+        ("Series (Digital).cbz", "(Digital)", "Series c001 (Digital).cbz"),
+        ("Series (Special).cbz", "(Special)", "Series c001 (Special).cbz"),
+    ],
+)
+def test_page_reclassified_chapter_keeps_filename_series_and_single_metadata_marker(
+    name: str, extra: str, rendered: str
+) -> None:
+    release = parse_release(
+        observed(
+            name,
+            root_role="download",
+            at_configured_root=True,
+            archive_pages=(ArchivePageObservation("01.png", False),),
+        ),
+        ParsingPolicy(chapter_support_toggle=True),
+    )
+
+    assert release.kind == "chapter"
+    assert release.number.values == (Decimal("1"),)
+    assert release.display_series == "Series"
+    assert release.extras == (extra,)
+    assert render_release(
+        release,
+        RenamePolicy(
+            add_volume_one_number_to_one_shots=True,
+            rename_chapters_with_preferred_chapter_keyword=True,
+        ),
+    ) == rendered
+
+
+@pytest.mark.parametrize(
+    ("name", "rendered"),
+    [
+        ("Series v01 Part 1.5.cbz", "Series Volume 01 Part 1.5.cbz"),
+        ("Series v01 Part 1-2.cbz", "Series Volume 01 Part 1-2.cbz"),
+    ],
+)
+def test_volume_part_capture_keeps_the_accepted_integer_prefix_and_filename(
+    name: str, rendered: str
+) -> None:
+    release = parse_release(observed(name), ParsingPolicy())
+
+    assert release.kind == "volume"
+    assert release.number.values == (Decimal("1"),)
+    assert release.number.part == 1
+    assert render_release(release, RenamePolicy(preferred_volume_renaming_format="Volume ")) == (
+        rendered
+    )

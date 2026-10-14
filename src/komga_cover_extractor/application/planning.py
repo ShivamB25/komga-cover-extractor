@@ -1,9 +1,13 @@
 """Compile a virtual file view into one recoverable publication group."""
 from __future__ import annotations
 
+import os
+import select
+import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
+from threading import Event
 from uuid import uuid4
 
 from ..domain.decisions import Decision, RunResult
@@ -16,7 +20,53 @@ from ..domain.operations import (
     RootPermission,
 )
 from ..domain.releases import ReleaseSnapshot
+from ..infrastructure.workers import WorkerError
 from ..parsing.filenames import ParsingPolicy, parse_release
+
+
+def read_interactive_line(cancel: Event, pending: bytearray) -> str:
+    descriptor = sys.stdin.fileno()
+    while True:
+        if cancel.is_set():
+            raise WorkerError("shutdown_requested", "cancelled")
+        newline = pending.find(b"\n")
+        if newline >= 0:
+            if newline > 4096:
+                raise WorkerError("interactive_input_byte_limit", "invalid_input")
+            try:
+                answer = pending[:newline].decode("utf-8").strip().lower()
+            except UnicodeDecodeError:
+                raise WorkerError("invalid_interactive_input", "invalid_input") from None
+            del pending[:newline + 1]
+            return answer
+        if len(pending) > 4096:
+            raise WorkerError("interactive_input_byte_limit", "invalid_input")
+        ready, _, _ = select.select((descriptor,), (), (), 0.2)
+        if not ready:
+            continue
+        chunk = os.read(descriptor, min(4096, 4097 - len(pending)))
+        if not chunk:
+            raise WorkerError("interactive_input_closed", "cancelled")
+        pending.extend(chunk)
+
+
+def unready_download_inputs(
+    operations: Sequence[Operation], *, files: Mapping[Path, FileFingerprint],
+    roots: Sequence[LibraryRoot], ready_downloads: tuple[FileFingerprint, ...] | None,
+) -> tuple[FileFingerprint, ...]:
+    if ready_downloads is None:
+        return ()
+    ready = {source.path: source for source in ready_downloads}
+    waiting: dict[Path, FileFingerprint] = {}
+    for operation in operations:
+        artifact_source = operation.artifact.source if operation.artifact is not None else None
+        if artifact_source is not None and artifact_source.path not in files:
+            artifact_source = None
+        for source in (operation.source, operation.destination_before, artifact_source):
+            if (source is not None and ready.get(source.path) != source
+                    and any("download" in root.roles and root.contains(source.path) for root in roots)):
+                waiting[source.path] = source
+    return tuple(waiting.values())
 
 
 def project_release(

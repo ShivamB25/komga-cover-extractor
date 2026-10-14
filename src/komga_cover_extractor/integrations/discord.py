@@ -121,7 +121,7 @@ def format_release_notification(release: ReleaseSnapshot) -> dict[str, object]:
     return format_embed(title=f"New {label}(s) Added", color=GREEN_COLOR, fields=fields)
 
 
-def _release_order(release: ReleaseSnapshot) -> tuple[bool, Decimal, int, str]:
+def _release_order(release: ReleaseSnapshot) -> tuple[bool, Decimal, int | Decimal, str]:
     return not bool(release.number.values), min(release.number.values, default=Decimal(0)), release.number.part or 0, release.name
 
 

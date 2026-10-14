@@ -357,7 +357,7 @@ def test_equal_rank_different_bytes_need_review_without_losing_either_candidate(
 ) -> None:
     _configure(workspace, check_for_existing_series_toggle=command == "organize")
     existing = workspace / "library" / "Series" / "Series v01 (A).cbz"
-    incoming = ((workspace / "downloads") if command == "organize" else existing.parent) / "Series v01 (B).cbz"
+    incoming = ((workspace / "downloads" / "Incoming") if command == "organize" else existing.parent) / "Series v01 (B).cbz"
     _book(existing, b"first equal-ranked book", "red")
     _book(incoming, b"different equal-ranked book", "green")
     existing.with_suffix(".png").write_bytes(_png("red"))
@@ -425,7 +425,7 @@ def test_upgrade_updates_only_proven_owned_series_art_and_preserves_custom_art(
     old_art = _png("red")
     assert cover.read_bytes() == old_art
     previous_mtime = cover.stat().st_mtime_ns
-    incoming = workspace / "downloads" / "Series v01 (Digital).cbz"
+    incoming = workspace / "downloads" / "Incoming" / "Series v01 (Digital).cbz"
     incoming_bytes = _book(incoming, b"replacement digital", "blue")
     new_art = _png("blue")
     incoming.with_suffix(".png").write_bytes(new_art)
@@ -485,7 +485,7 @@ def test_complete_collection_upgrade_retains_components_after_verified_publicati
     originals = {path: _book(path, f"component {number}".encode()) for number, path in components.items()}
     for number, path in components.items():
         path.with_suffix(".png").write_bytes(_png("red" if number % 2 else "green"))
-    collection = workspace / "downloads" / collection_name
+    collection = workspace / "downloads" / "Incoming" / collection_name
     collection_bytes = _book(collection, b"verified complete collection", "blue")
     collection_art = _png("blue")
     collection.with_suffix(".png").write_bytes(collection_art)
@@ -537,7 +537,7 @@ def test_uncertain_collection_upgrade_preserves_every_component_and_sidecar(
         path = workspace / "library" / "Series" / name
         _book(path, name.encode(), "red")
         path.with_suffix(".png").write_bytes(_png("red"))
-    incoming = workspace / "downloads" / incoming_name
+    incoming = workspace / "downloads" / "Incoming" / incoming_name
     _book(incoming, b"collection candidate", "blue")
     incoming.with_suffix(".png").write_bytes(_png("blue"))
     before = _tree(workspace)
@@ -555,7 +555,7 @@ def test_two_equally_eligible_series_folders_are_not_a_first_directory_winner(wo
     second = workspace / "library" / "Second" / "Series"
     _book(first / "Series v01.cbz", b"first library candidate")
     _book(second / "Series v01.cbz", b"second library candidate", "green")
-    incoming = workspace / "downloads" / "Series v02.cbz"
+    incoming = workspace / "downloads" / "Incoming" / "Series v02.cbz"
     _book(incoming, b"incoming second volume", "blue")
     incoming.with_suffix(".png").write_bytes(_png("blue"))
     before = _tree(workspace)
@@ -574,7 +574,7 @@ def test_unreadable_library_archive_is_not_empty_success_or_upgrade_permission(w
     existing.parent.mkdir()
     existing.write_bytes(b"Corrupt archive. Content identity and library evidence are unavailable.")
     existing.with_suffix(".png").write_bytes(_png("red"))
-    incoming = workspace / "downloads" / "Series v01 (Digital).cbz"
+    incoming = workspace / "downloads" / "Incoming" / "Series v01 (Digital).cbz"
     _book(incoming, b"otherwise valid higher-ranked candidate", "blue")
     before = _tree(workspace)
 
@@ -699,3 +699,41 @@ def test_complete_run_uses_original_bytes_through_header_conversion_rename_match
                    for path in (workspace / "downloads").rglob("*"))
     _assert_retained(workspace, source_bytes)
     _assert_no_republication(workspace, "run")
+
+
+@pytest.mark.parametrize("restructure", [False, True])
+@pytest.mark.parametrize(
+    ("name", "target_name", "part"),
+    [
+        ("Series c53x0.cbz", "Series c053x0.cbz", 0),
+        ("Series c53x1.5.cbz", "Series c53x1.5.cbz", "1.5"),
+    ],
+)
+def test_cli_preserves_legacy_zero_and_fractional_chapter_parts_during_rename(
+    workspace: Path, restructure: bool, name: str, target_name: str, part: int | str,
+) -> None:
+    _configure(
+        workspace, rename_files_in_download_folders_toggle=True,
+        restructure_when_renaming=restructure,
+    )
+    source = workspace / "downloads" / "Incoming" / name
+    original = _book(source, b"zero or fractional chapter part")
+    target = source.with_name(target_name)
+    expected_commits = int(target != source)
+    before = _tree(workspace)
+
+    inspected = _cli(workspace, "inspect", str(source))
+    number = inspected["releases"][0]["number"]
+    assert number["values"] == ["53"] and number["part"] == part
+    preview = _cli(workspace, "organize")
+    assert preview["counts"]["planned"] == expected_commits and preview["counts"]["committed"] == 0
+    _assert_pristine(workspace, before)
+
+    applied = _cli(workspace, "organize", "--apply")
+    assert applied["counts"]["committed"] == expected_commits and applied["counts"]["failed"] == 0
+    assert target.read_bytes() == original
+    if target != source:
+        assert not source.exists()
+    observed = next(release for release in applied["releases"] if release["path"] == str(target))
+    assert observed["number"]["values"] == ["53"] and observed["number"]["part"] == part
+    _assert_no_republication(workspace, "organize")

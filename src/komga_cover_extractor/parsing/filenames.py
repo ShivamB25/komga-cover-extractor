@@ -435,22 +435,19 @@ def _is_one_shot(
 
 
 def _page_heuristic(observation: FileObservation, policy: ParsingPolicy) -> bool:
-    pages = tuple(
-        page
-        for page in observation.archive_pages
-        if not page.is_directory
-        and not page.name.rsplit("/", 1)[-1].startswith((".", "__"))
-        and _get_extension(page.name).lower() in _DEFAULT_IMAGE_EXTENSIONS
-    )
-    if not pages:
+    if not observation.archive_pages:
         return False
+    page_count = sum(
+        _get_extension(page.name).lower() in _DEFAULT_IMAGE_EXTENSIONS
+        for page in observation.archive_pages
+    )
     first = min(observation.archive_pages, key=lambda page: page.name)
     grayscale_first = (
         not first.is_directory
-        and _get_extension(first.name).lower() in _DEFAULT_IMAGE_EXTENSIONS
+        and _get_extension(first.name) in _DEFAULT_IMAGE_EXTENSIONS
         and first.is_grayscale is True
     )
-    return grayscale_first or len(pages) <= policy.average_chapter_image_count
+    return grayscale_first or page_count <= policy.average_chapter_image_count
 
 
 def _series_name_from_contents(folder_name: str, file_names: Sequence[str]) -> str:
@@ -702,6 +699,12 @@ def parse_release(observation: FileObservation, policy: ParsingPolicy) -> Releas
         has_volume_keyword=has_volume_keyword,
         has_chapter_keyword=has_chapter_keyword,
     )
+    if kind == "chapter":
+        display_series = _chapter_series_name(name, observation, number, policy)
+    else:
+        display_series = _volume_series_name(name, observation, number, policy, one_shot)
+    if not display_series:
+        display_series = _series_name_from_contents(observation.path.parent.name, (name,))
     exception = _file_is_exception(name, policy)
     number_missing_or_zero = number.kind == "missing" or (
         number.kind == "scalar" and number.values[0] == 0
@@ -725,12 +728,6 @@ def parse_release(observation: FileObservation, policy: ParsingPolicy) -> Releas
     publisher_from_metadata = _publisher_from_metadata(metadata)
     publisher_from_name = _publisher_from_name(name, policy)
     publisher = publisher_from_metadata or publisher_from_name
-    if kind == "chapter":
-        display_series = _chapter_series_name(name, observation, number, policy)
-    else:
-        display_series = _volume_series_name(name, observation, number, policy, one_shot)
-    if not display_series:
-        display_series = _series_name_from_contents(observation.path.parent.name, (name,))
 
     release_group = _release_group(name, display_series, policy)
     subtitle = _subtitle(
@@ -810,31 +807,28 @@ def _format_number_token(
 
 
 def _render_number(
-    release: ReleaseSnapshot, policy: RenamePolicy, source_span: tuple[int, int] | None
+    release: ReleaseSnapshot, policy: RenamePolicy, source_match: regex.Match[str] | None
 ) -> str:
     number = release.number
     if number.kind == "missing":
         return ""
-    extra_marker = bool(regex.search(r"\d_extra\b", release.name))
-    tokens = tuple(
+    tokens = [(token, False) for token in number.raw_tokens]
+    if source_match is not None and "_extra" in source_match.group("number"):
+        tokens = [
+            (token.replace("_extra", ".5").replace("_", "."), "_extra" in token)
+            for token in source_match.group("number").split("-")
+        ]
+        if number.kind == "range":
+            tokens.sort(key=lambda item: Decimal(item[0]))
+    token = "-".join(
         _format_number_token(
-            token,
-            kind=release.kind,
-            policy=policy,
-            extra_marker=extra_marker and index == len(number.raw_tokens) - 1,
-        )
-        for index, token in enumerate(number.raw_tokens)
+            raw_token, kind=release.kind, policy=policy, extra_marker=extra_marker
+        ) + ("_extra" if extra_marker else "")
+        for raw_token, extra_marker in tokens
     )
-    token = "-".join(tokens)
     if release.kind == "chapter" and number.part is not None:
-        indicator = "x"
-        part_match = regex.search(
-            r"\d+(?:[._-]\d+)*(?P<marker>[x#])\d+",
-            release.name[source_span[0]:source_span[1]] if source_span else "",
-            flags=regex.IGNORECASE,
-        )
-        if part_match:
-            indicator = part_match.group("marker")
+        part = source_match.group("part") if source_match is not None else None
+        indicator = part[0] if part else "x"
         token += f"{indicator}{number.part}"
     return token
 
@@ -847,16 +841,25 @@ def _render_keyword(release: ReleaseSnapshot, policy: RenamePolicy) -> str:
     )
 
 
+def _source_number_token(token: str) -> str:
+    """Match an endpoint's decimal value or its original _extra spelling."""
+    pattern = regex.escape(token).replace(r"\.", r"[._]")
+    if token.endswith(".5"):
+        return rf"(?:{pattern}|{regex.escape(token[:-2])}_extra)"
+    return pattern
+
+
 def _render_source_match(
     name: str, release: ReleaseSnapshot, policy: RenamePolicy
-) -> tuple[int, int] | None:
+) -> regex.Match[str] | None:
     if release.number.kind == "missing":
         return None
     patterns = policy.number_policy._compiled
-    source_tokens = list(release.number.raw_tokens)
-    if regex.search(r"\d_extra\b", name) and source_tokens[-1].endswith(".5"):
-        source_tokens[-1] = source_tokens[-1][:-2]
-    sequence = "-".join(regex.escape(token).replace(r"\.", r"[._]") for token in source_tokens)
+    source_tokens = tuple(_source_number_token(token) for token in release.number.raw_tokens)
+    sequence = "-".join(source_tokens)
+    if release.number.kind == "range":
+        reverse_sequence = "-".join(reversed(source_tokens))
+        sequence = f"(?:{sequence}|{reverse_sequence})"
     series_pattern = regex.escape(release.display_series).replace(r"\ ", r"[_ ]+")
     series = regex.search(series_pattern, name, flags=regex.IGNORECASE) if release.display_series else None
     start = series.end() if series else 0
@@ -865,35 +868,35 @@ def _render_source_match(
         if release.kind == "volume"
         else patterns.chapter_keywords_expression
     )
+    part_boundary = r"|[x#]\d" if release.kind == "chapter" else ""
     if keyword != r"(?!)":
-        part_expression = r"(?P<part>[x#]\d+(?:[-_.]\d+)*)?" if release.kind == "chapter" else ""
+        part_expression = r"(?P<part>x\d+|#\d+(?:[-_.]\d+)*)?" if release.kind == "chapter" else ""
         issue_expression = r"(?:\s+#\d+(?:[-_.]\d+)*)?" if release.kind == "volume" else ""
         match = regex.search(
             rf"(?<![A-Za-z\[\(\{{])(?P<keyword>(?:{keyword}))[-_.\s]*"
             rf"(?P<number>{sequence}){part_expression}"
-            rf"(?P<extra>_extra)?{issue_expression}",
-            name[start:],
+            rf"{issue_expression}(?!\d|[._-]\d{part_boundary})",
+            name,
+            pos=start,
             flags=regex.IGNORECASE,
         )
         if match:
             if release.subtitle and patterns.subtitle_exclusion.search(
-                name, 0, start + match.start("keyword")
+                name, 0, match.start("keyword")
             ):
                 return None
-            return start + match.start("keyword"), start + match.end()
+            return match
     if release.kind != "chapter" or _find_number_match(name, "chapter", policy.number_policy) is None:
         return None
 
-    part_expression = r"(?:[x#]\d+)?" if release.number.part is not None else ""
+    part_expression = r"(?P<part>x\d+|#\d+(?:[-_.]\d+)*)?" if release.number.part is not None else ""
     match = regex.search(
-        rf"(?<![\d.])#?{sequence}{part_expression}(?:_extra)?(?!\d)",
-        name[start:],
+        rf"(?<![\d.])#?(?P<number>{sequence}){part_expression}(?!\d|[._-]\d|[x#]\d)",
+        name,
+        pos=start,
         flags=regex.IGNORECASE,
     )
-    if match is None:
-        return None
-    span = start + match.start(), start + match.end()
-    return span
+    return match
 
 
 def _modifier(extension: str) -> str:
@@ -917,21 +920,21 @@ def _restructure(release: ReleaseSnapshot, policy: RenamePolicy) -> str:
     if _is_one_shot_release(release) and not policy.add_volume_one_number_to_one_shots:
         return release.name
 
-    source_span = _render_source_match(release.name, release, policy)
-    number = _render_number(release, policy, source_span)
+    source_match = _render_source_match(release.name, release, policy)
+    if release.kind == "chapter" and release.number.part is not None and source_match is None:
+        return release.name
+    number = _render_number(release, policy, source_match)
     if not number:
         return release.name
     keyword = _render_keyword(release, policy)
     base = release.display_series.strip()
     rename = f"{base} {keyword}{number}"
-    if "filename:extra_marker" in release.provenance:
-        rename += "_extra"
     if (
         policy.add_issue_number_to_manga_file_name
         and release.kind == "volume"
         and extension in _DEFAULT_MANGA_EXTENSIONS
     ):
-        rename += f" #{number}"
+        rename += f" #{number.replace('_extra', '')}"
     if release.subtitle:
         rename += f" - {release.subtitle}"
     modifier = _modifier(extension)
@@ -1006,22 +1009,20 @@ def _render_release_name(release: ReleaseSnapshot, policy: RenamePolicy) -> str:
     if policy.restructure_when_renaming:
         return _restructure(release, policy)
 
-    span = _render_source_match(release.name, release, policy)
-    number = _render_number(release, policy, span)
+    source_match = _render_source_match(release.name, release, policy)
+    number = _render_number(release, policy, source_match)
     if not number:
         return release.name
     replacement = f"{_render_keyword(release, policy)}{number}"
-    if span is None:
+    if source_match is None:
         if not _is_one_shot_release(release):
             return release.name
-        if "filename:extra_marker" in release.provenance:
-            replacement += "_extra"
         if (
             policy.add_issue_number_to_manga_file_name
             and release.kind == "volume"
             and release.path.suffix in _DEFAULT_MANGA_EXTENSIONS
         ):
-            replacement += f" #{number}"
+            replacement += f" #{number.replace('_extra', '')}"
         result = f"{release.display_series} {replacement}"
         if release.subtitle:
             result += f" - {release.subtitle}"
@@ -1031,15 +1032,13 @@ def _render_release_name(release: ReleaseSnapshot, policy: RenamePolicy) -> str:
             result += " " + " ".join(release.extras)
         result += release.path.suffix
     else:
-        start, end = span
-        if "_extra" in release.name[start:end]:
-            replacement += "_extra"
+        start, end = source_match.span()
         if (
             policy.add_issue_number_to_manga_file_name
             and release.kind == "volume"
             and release.path.suffix in _DEFAULT_MANGA_EXTENSIONS
         ):
-            replacement += f" #{number}"
+            replacement += f" #{number.replace('_extra', '')}"
         result = release.name[:start] + replacement + release.name[end:]
 
     result = regex.sub(r"_(?!extra\b)", " ", result.replace("?", ""))

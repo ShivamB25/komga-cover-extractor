@@ -12,12 +12,18 @@ from ..domain.decisions import Decision, RunAuthorization, RunResult, Status
 from ..domain.libraries import LibraryRoot, normalize_library_roots
 from ..domain.operations import Operation, OperationPlan, RootPermission
 from ..domain.releases import ReleaseSnapshot
-from ..infrastructure.filesystem import FilesystemError, checked_path, fingerprint
+from ..infrastructure.filesystem import (
+    FilesystemError,
+    checked_path,
+    fingerprint,
+    matches,
+)
 from ..infrastructure.transactions import TransactionExecutor
 from ..infrastructure.workers import WorkerError
 from ..infrastructure.zip_archive import ArchiveError, ArchivePolicy
 from ..parsing.filenames import ParsingPolicy, parse_release
-from .convert import observe_header
+from .convert import HeaderObservation, observe_header
+from .planning import read_interactive_line
 
 
 def correct_headers(
@@ -25,12 +31,14 @@ def correct_headers(
     parsing: ParsingPolicy, archive_policy: ArchivePolicy, state_dir: Path,
     policy_version: str, authorization: RunAuthorization, cancel: Event,
     manual_rename: bool, interactive: bool = False, rename_zip_to_cbz: bool = True,
+    zip_only: bool = False, observations: dict[Path, HeaderObservation] | None = None,
 ) -> RunResult:
     roots = normalize_library_roots(roots)
     decisions: list[Decision] = []
     plans: list[OperationPlan] = []
     projected: list[ReleaseSnapshot] = []
     committed = skipped = failed = 0
+    pending_input = bytearray()
     for release in releases:
         source = release.observation.fingerprint
         projected.append(release)
@@ -46,9 +54,17 @@ def correct_headers(
             failed += 1
             continue
         try:
-            header = observe_header(source.path, root=source.root, policy=archive_policy, cancel=cancel)
-            if header.source != source:
+            header = observations.get(source.path) if observations is not None else None
+            if header is None:
+                header = observe_header(source.path, root=source.root, policy=archive_policy, cancel=cancel)
+                if observations is not None:
+                    observations[source.path] = header
+            if header.source != source or not matches(source):
                 decisions.append(Decision("stale_plan", "header_source_changed", source.path))
+                continue
+            if zip_only and (header.container != "zip" or source.path.suffix.lower() != ".zip"):
+                skipped += 1
+                decisions.append(Decision("skipped", "conversion_zip_rename_not_applicable", source.path))
                 continue
             destination = release.path.with_suffix(header.target_suffix)
             if destination == release.path or (source.path.suffix.lower() == ".zip" and not rename_zip_to_cbz and header.container == "zip"):
@@ -66,7 +82,7 @@ def correct_headers(
                 sys.stderr.write(f"Rename {str(source.path)!r} to {str(destination)!r}? Type rename or keep: ")
                 sys.stderr.flush()
                 try:
-                    choice = sys.stdin.readline().strip().lower()
+                    choice = read_interactive_line(cancel, pending_input)
                 except (EOFError, KeyboardInterrupt):
                     decisions.append(Decision("cancelled", "interactive_choice_cancelled", source.path))
                     continue

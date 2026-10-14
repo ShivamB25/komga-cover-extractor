@@ -90,3 +90,45 @@ def test_worker_policy_round_trip_keeps_effective_decisions() -> None:
     invalid = original.as_dict() | {"arbitrary_function": "extractall"}
     with pytest.raises(ValueError):
         CoverPolicy.from_dict(invalid)
+
+
+@pytest.mark.parametrize(("raw_first", "canonical_first", "other"), [
+    ("./z.png", "z.png", "a.png"),
+    ("dir//01.png", "dir/01.png", "dir/00.png"),
+])
+def test_comic_preserves_raw_lexical_order_with_canonical_lookup(
+    raw_first: str, canonical_first: str, other: str,
+) -> None:
+    members = (
+        ArchiveMember(other, 1, 1, False, other),
+        ArchiveMember(canonical_first, 1, 1, False, raw_first),
+    )
+    result = select_cover_candidates(members, policy=CoverPolicy(ArchivePolicy()), is_epub=False)
+    assert (result.status, result.candidates) == ("valid", (canonical_first, other))
+
+
+def test_authoritative_blank_filter_keeps_authority_before_ordered_safe_fallback() -> None:
+    policy = CoverPolicy(ArchivePolicy(), compare_detected_cover_to_blank_images=True,
+                         cover_patterns=(r"p000", r"cover"))
+    reference = EpubCoverReference("found", "OPS/front.png", "epub3_cover", True)
+    result = select_cover_candidates(
+        _members("OPS/01.png", "OPS/cover.png", "OPS/p000.png", "OPS/front.png"),
+        policy=policy, is_epub=True, reference=reference,
+    )
+    assert result.candidates == ("OPS/front.png", "OPS/p000.png", "OPS/cover.png", "OPS/01.png")
+    assert result.pattern_groups == (("OPS/front.png",), ("OPS/p000.png",), ("OPS/cover.png",))
+
+
+@pytest.mark.parametrize("reference", [
+    EpubCoverReference("invalid", None, "unsafe_epub_cover", True),
+    EpubCoverReference("ambiguous", None, "multiple_epub_covers", True),
+    EpubCoverReference("found", "missing.jpg", "epub3_cover", True),
+])
+def test_blank_filter_never_turns_invalid_authority_into_fallback(reference: EpubCoverReference) -> None:
+    result = select_cover_candidates(
+        _members("OPS/cover.png", "OPS/p000.png"),
+        policy=CoverPolicy(ArchivePolicy(), compare_detected_cover_to_blank_images=True),
+        is_epub=True, reference=reference,
+    )
+    assert result.status == ("ambiguous" if reference.status == "ambiguous" else "invalid_input")
+    assert (result.candidates, result.pattern_groups, result.fallback_candidates) == ((), (), ())

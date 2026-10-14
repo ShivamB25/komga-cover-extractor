@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 from threading import Event, Lock
 from time import monotonic
-from typing import TYPE_CHECKING, Literal, TypedDict, cast
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
 
 from ..covers.selection import IMAGE_SUFFIXES
 from ..domain.decisions import Decision, RunResult, Status
@@ -78,6 +78,7 @@ class _Job(TypedDict):
     error: str | None
     interrupted: bool
     reusable: bool
+    part_count: NotRequired[int]
 
 
 class _Settled(TypedDict):
@@ -85,18 +86,44 @@ class _Settled(TypedDict):
     operations: tuple[str, ...]
     expires: float
     policy_version: str
+    ready: bool
+    sample: Sample
+    ready_after: float | None
 
 
-def check_archive_readable(observed: FileFingerprint, *, policy: ArchivePolicy, cancel: Event) -> Decision:
+def check_archive_readable(
+    observed: FileFingerprint, *, policy: ArchivePolicy, cancel: Event,
+    on_sources: Callable[[tuple[FileFingerprint, ...]], None] | None = None,
+) -> Decision:
     if observed.path.suffix.lower() not in BOOK_SUFFIXES:
         return Decision("observed", "regular_file_ready", observed.path)
     try:
-        run_worker(
-            "inspect", {"book": str(observed.path), "root": str(observed.root), "archive_policy": policy.as_dict()},
+        response = run_worker(
+            "inspect", {"book": str(observed.path), "root": str(observed.root),
+                        "archive_policy": policy.as_dict(), "readiness_only": True},
             timeout=policy.conversion_timeout_seconds, cancel=cancel,
         )
         if not matches(observed):
             return Decision("stale_plan", "source_changed", observed.path)
+        if on_sources is not None:
+            source_values = response.get("source_fingerprints")
+            if not isinstance(source_values, list) or not 1 <= len(source_values) <= policy.archive_max_entries:
+                raise WorkerError("invalid_archive_source_observation", "invalid_input")
+            sources: list[FileFingerprint] = []
+            for value in source_values:
+                if not isinstance(value, dict) or not isinstance(value.get("relative_path"), str):
+                    raise WorkerError("invalid_archive_source_observation", "invalid_input")
+                path = observed.root / value["relative_path"]
+                try:
+                    source = _fingerprint_from_json(value, path, observed.root)
+                except (ValueError, TypeError):
+                    raise WorkerError("invalid_archive_source_observation", "invalid_input") from None
+                if source is None or not path.is_relative_to(observed.root) or not matches(source):
+                    raise WorkerError("source_changed", "stale_plan")
+                sources.append(source)
+            if observed not in sources:
+                raise WorkerError("invalid_archive_source_observation", "invalid_input")
+            on_sources(tuple(sources))
     except WorkerError as error:
         status = cast(Status, error.status if error.status in _ERROR_STATUSES | _REVIEW_STATUSES | {"cancelled", "no_match"} else "failed")
         return Decision(status, error.reason, observed.path)
@@ -173,7 +200,9 @@ class WatchCoordinator:
         self.candidate_filter = candidate_filter
         self.invalidate = invalidate
         self.ignored_roots = tuple(path.absolute() for path in (pipeline.state_dir, *ignored_roots))
-        self._readable = readable or (lambda observed: check_archive_readable(observed, policy=pipeline.archive, cancel=pipeline.cancel))
+        self._readable = readable or (lambda observed: check_archive_readable(
+            observed, policy=pipeline.archive, cancel=pipeline.cancel, on_sources=self._remember_parts,
+        ))
         self._capacity = int(values["watch_queue_capacity"])
         self._limit = int(values["watch_max_pending_jobs"])
         self._sample_interval = float(values["watchdog_file_transferred_check_interval"])
@@ -191,6 +220,8 @@ class WatchCoordinator:
         self._persistent = False
         self._pending: dict[Path, _Job] = {}
         self._obligations: dict[str, _Job] = {}
+        self._archive_parts: OrderedDict[Path, tuple[FileFingerprint, FileFingerprint]] = OrderedDict()
+        self._auxiliary_samples: OrderedDict[Path, tuple[Sample, float]] = OrderedDict()
         self._settled: OrderedDict[Path, _Settled] = OrderedDict()
         self._observers: dict[Path, BaseObserver] = {}
         self._root_identities: dict[Path, tuple[int, int] | None] = {}
@@ -238,12 +269,14 @@ class WatchCoordinator:
         path = path.absolute()
         return next((root for root in self.watch_roots if root.contains(path)), None)
 
+    def _scope_eligible(self, path: Path, root: Path) -> bool:
+        return path.is_relative_to(root) and not (
+            any(part.startswith(".") for part in path.relative_to(root).parts)
+            or any(path.is_relative_to(ignored) for ignored in self.ignored_roots)
+        )
+
     def _eligible(self, path: Path, root: Path) -> bool:
-        if not path.is_relative_to(root) or path == root:
-            return False
-        if any(part.startswith(".") for part in path.relative_to(root).parts):
-            return False
-        if any(path.is_relative_to(ignored) for ignored in self.ignored_roots):
+        if path == root or not self._scope_eligible(path, root):
             return False
         if path.name.casefold().endswith((".part", ".tmp", ".!qb")):
             return False
@@ -502,15 +535,18 @@ class WatchCoordinator:
         except OSError:
             return False
 
-    def _remember(self, job: _Job) -> None:
-        observed = job["fingerprint"]
+    def _remember(
+        self, observed: FileFingerprint | None, operations: tuple[str, ...], sample: Sample, *,
+        ready: bool = False, reusable: bool = False,
+    ) -> None:
         if observed is None:
             return
-        self._settled[job["path"]] = {
-            "fingerprint": observed, "operations": job["operations"],
+        self._settled[observed.path] = {
+            "fingerprint": observed, "operations": operations,
             "expires": self.clock() + 300, "policy_version": self.pipeline.policy_version,
+            "ready": ready, "sample": sample, "ready_after": self.clock() + self._quiet if reusable else None,
         }
-        self._settled.move_to_end(job["path"])
+        self._settled.move_to_end(observed.path)
         while len(self._settled) > self._limit:
             self._settled.popitem(last=False)
 
@@ -544,13 +580,17 @@ class WatchCoordinator:
         if pending is not None and pending["phase"] in {"committed", "delivery_pending"}:
             self._detach_obligation(pending)
         settled = self._settled.get(path)
-        if observed is not None and settled is not None and settled["policy_version"] == self.pipeline.policy_version and settled["fingerprint"] == observed and settled["expires"] > self.clock() and self._outputs_current(settled["operations"]):
+        if observed is not None and settled is not None and settled["sample"] == sample and settled["policy_version"] == self.pipeline.policy_version and settled["fingerprint"] == observed and settled["expires"] > self.clock() and self._outputs_current(settled["operations"]):
             self._settled.move_to_end(path)
             return
         if self.state is not None and observed is not None:
             artifact = self.state.committed_artifact(path)
-            if artifact is not None and artifact.published == observed and json.loads(artifact.plan_json).get("policy_version") == self.pipeline.policy_version:
-                return
+            if artifact is not None and artifact.published == observed:
+                plan = json.loads(artifact.plan_json)
+                identity = plan.get("operation_id")
+                if plan.get("policy_version") == self.pipeline.policy_version and isinstance(identity, str):
+                    self._remember(observed, (identity,), sample, reusable=True)
+                    return
             record = self.state.get_job(self._job_id(path, root))
             if record is not None:
                 try:
@@ -586,7 +626,7 @@ class WatchCoordinator:
                         self._issue(path, prior["error"] or "watch_job_requires_review", "review_required" if prior["phase"] == "review_required" else "failed", prior["operations"])
                         return
                     if prior["phase"] == "complete" and prior["reusable"] and self._outputs_current(prior["operations"]):
-                        self._remember(prior)
+                        self._remember(observed, prior["operations"], sample, reusable=True)
                         return
                 elif prior["phase"] in {"committed", "delivery_pending"} and self._obligation_id(prior) not in self._obligations:
                     if self.pending_count < self._limit:
@@ -653,7 +693,7 @@ class WatchCoordinator:
         return (*tuple(value for part in relative.parent.parts for value in ("1", part)), "0", relative.name)
 
     def _scan(self, root: Path, scope: Path) -> None:
-        if not scope.is_relative_to(root) or any(scope.is_relative_to(ignored) for ignored in self.ignored_roots):
+        if not self._scope_eligible(scope, root):
             return
         missing = {path for path, job in self._pending.items() if job["root"] == root and path.is_relative_to(scope)}
         saturated = False
@@ -716,7 +756,9 @@ class WatchCoordinator:
         for path in missing:
             self._remove(path)
         self._issues.pop((root, "watch_pending_limit"), None)
-        self._issues.pop((scope, "watch_reconciliation_incomplete"), None)
+        for key in tuple(self._issues):
+            if key[1] == "watch_reconciliation_incomplete" and key[0].is_relative_to(scope):
+                self._issues.pop(key)
         self._marker(root, None)
 
     def reconcile(self, scopes: tuple[Path, ...] = ()) -> None:
@@ -751,7 +793,7 @@ class WatchCoordinator:
                     self._remove(source, directory=directory)
             if kind in {"created", "modified"} and root is not None:
                 if directory:
-                    if kind == "created":
+                    if kind == "created" and self._scope_eligible(source, root.path):
                         scopes.add(source)
                 else:
                     self._discover(source, root.path)
@@ -760,7 +802,8 @@ class WatchCoordinator:
                 target_root = self._root_for(destination)
                 if target_root is not None:
                     if directory:
-                        scopes.add(destination)
+                        if self._scope_eligible(destination, target_root.path):
+                            scopes.add(destination)
                     else:
                         self._discover(destination, target_root.path)
         if overflow:
@@ -779,16 +822,25 @@ class WatchCoordinator:
         if self._obligations.get(obligation_id) is job:
             del self._obligations[obligation_id]
         elif self._pending.get(job["path"]) is job:
-            self._remember(job)
+            self._remember(
+                job["fingerprint"], job["operations"], job["sample"],
+                ready=phase == "complete" and error is None and not job["interrupted"],
+            )
             del self._pending[job["path"]]
 
     def _retry(self, job: _Job, decision: Decision) -> None:
-        job["attempts"] += 1
-        if decision.reason in _TRANSIENT_REASONS and job["attempts"] < self._retries:
+        dependency_wait = decision.reason in {"incomplete_multipart_archive", "multipart_first_volume_required"}
+        if not dependency_wait:
+            job["attempts"] += 1
+        if dependency_wait or (
+            decision.reason in _TRANSIENT_REASONS and job["attempts"] < self._retries
+        ):
             job["phase"] = "waiting_ready"
             job["stable_since"] = self.clock()
             job["next_sample"] = self.clock() + self._sample_interval
             job["error"] = decision.reason
+            if dependency_wait:
+                self._issue(job["path"], decision.reason)
             self._save(job)
             return
         phase: Phase = "review_required" if decision.status in _REVIEW_STATUSES else "failed"
@@ -843,18 +895,105 @@ class WatchCoordinator:
             self._deferred.pop(identity, None)
         self._issues.pop((job["path"], "watch_delivery_pending"), None)
         self._issues.pop((job["path"], "watch_delivery_or_cleanup_pending"), None)
-        self._finish(job, "complete")
+        if job["error"] == "watch_scope_not_ready" and self._pending.get(job["path"]) is job:
+            job["phase"] = "waiting_ready"
+            job["operations"] = ()
+            job["deferred"] = ()
+            job["reusable"] = False
+            job["attempts"] = 0
+            job["next_sample"] = self.clock() + self._sample_interval
+            self._save(job)
+        else:
+            self._finish(job, "complete")
+
+    def _remember_parts(self, sources: tuple[FileFingerprint, ...]) -> None:
+        job = self._pending.get(sources[0].path)
+        if job is not None:
+            job["part_count"] = len(sources) - 1
+        for observed in sources[1:]:
+            self._archive_parts[observed.path] = sources[0], observed
+            self._archive_parts.move_to_end(observed.path)
+        while len(self._archive_parts) > self._limit:
+            self._archive_parts.popitem(last=False)
+
+    def _ready_auxiliaries(self, books: tuple[FileFingerprint, ...]) -> tuple[FileFingerprint, ...]:
+        ready: list[FileFingerprint] = []
+        scopes = {(book.root, book.path.parent) for book in books}
+        for root, scope in sorted(scopes):
+            for directory, folders, names in os.walk(scope, followlinks=False):
+                folders[:] = sorted(name for name in folders if self._scope_eligible(Path(directory) / name, root))
+                if scope == root:
+                    folders.clear()
+                for name in sorted(names):
+                    path = Path(directory) / name
+                    if (not self._scope_eligible(path, root)
+                            or path.suffix.lower() in BOOK_SUFFIXES and path not in self._archive_parts
+                            or name.casefold().endswith((".part", ".tmp", ".!qb"))):
+                        continue
+                    if self.stop.is_set() or self.pipeline.cancel.is_set():
+                        return ()
+                    try:
+                        if self.downloader_complete is not None and self.downloader_complete(path) is False:
+                            self._auxiliary_samples.pop(path, None)
+                            continue
+                        sample = _sample(path, root)
+                        previous = self._auxiliary_samples.get(path)
+                        if previous is None or previous[0] != sample:
+                            self._auxiliary_samples[path] = (sample, self.clock())
+                        elif self.clock() - previous[1] >= self._quiet:
+                            observed = fingerprint(path, root)
+                            if (_sample(path, root) == sample and matches(observed)
+                                    and (path not in self._archive_parts or self._archive_parts[path][1] == observed)):
+                                ready.append(observed)
+                        self._auxiliary_samples.move_to_end(path)
+                        while len(self._auxiliary_samples) > self._limit:
+                            self._auxiliary_samples.popitem(last=False)
+                    except OSError:
+                        self._auxiliary_samples.pop(path, None)
+        return tuple(ready)
+
+    def _ready_downloads(self, job: _Job) -> tuple[FileFingerprint, ...]:
+        ready = {path: (settled["fingerprint"], settled["sample"]) for path, settled in self._settled.items()
+                 if (settled["ready"] or settled["ready_after"] is not None and self.clock() >= settled["ready_after"])
+                 and settled["expires"] > self.clock()
+                 and settled["policy_version"] == self.pipeline.policy_version
+                 and self._outputs_current(settled["operations"])}
+        ready.update((candidate["path"], (candidate["fingerprint"], candidate["sample"])) for candidate in self._pending.values()
+                     if candidate["phase"] == "ready" and candidate["fingerprint"] is not None)
+        if job["fingerprint"] is not None:
+            ready[job["path"]] = job["fingerprint"], job["sample"]
+        verified: list[FileFingerprint] = []
+        for path, (observed, sample) in ready.items():
+            try:
+                if _sample(path, observed.root) == sample and matches(observed) and (
+                    self.downloader_complete is None or self.downloader_complete(path) is not False
+                ):
+                    verified.append(observed)
+                else:
+                    self._discover(path, observed.root)
+            except OSError:
+                self._discover(path, observed.root)
+        books = tuple(verified)
+        return (*books, *self._ready_auxiliaries(books))
 
     def _run_job(self, job: _Job) -> None:
         observed = job["fingerprint"]
         assert observed is not None
+        ready_downloads = self._ready_downloads(job)
+        parts = tuple(part for owner, part in self._archive_parts.values() if owner == observed)
+        if len(parts) != job.get("part_count", 0) or any(part not in ready_downloads for part in parts):
+            job["phase"] = "waiting_ready"
+            job["next_sample"] = self.clock() + self._sample_interval
+            job["error"] = "watch_scope_not_ready"
+            self._save(job)
+            return
         job["phase"] = "running"
         self._save(job)
         try:
             result = self.pipeline.run(RunRequest(
                 command="run", books=(job["path"],), roots=self.roots,
                 authorization=self.request.authorization, interactive=self.request.interactive,
-                watch=True,
+                watch=True, ready_downloads=ready_downloads,
             ))
         except Exception:
             job["interrupted"] = True
@@ -883,6 +1022,13 @@ class WatchCoordinator:
                 job["error"] = decisions[0].reason if decisions else None
                 self._save(job)
                 self._settle_obligations(job)
+            self._record(result)
+            return
+        elif any(decision.reason == "watch_scope_not_ready" for decision in decisions) and not journalled:
+            job["phase"] = "waiting_ready"
+            job["next_sample"] = self.clock() + self._sample_interval
+            job["error"] = "watch_scope_not_ready"
+            self._save(job)
             self._record(result)
             return
         elif decisions or result.failed:
@@ -964,9 +1110,9 @@ class WatchCoordinator:
                 self._discover(job["path"], job["root"], observed=observed)
                 continue
             job["fingerprint"] = observed
-            job["phase"] = "ready"
-            self._save(job)
-            readable = self._readable(observed)
+            part = self._archive_parts.get(observed.path)
+            readable = (Decision("observed", "archive_part_readable", observed.path)
+                        if part is not None and part[1] == observed else self._readable(observed))
             if readable.status != "observed":
                 if readable.status == "cancelled":
                     job["phase"] = "waiting_ready"
@@ -981,8 +1127,21 @@ class WatchCoordinator:
             if not unchanged:
                 self._discover(job["path"], job["root"])
                 continue
-            self._run_job(job)
-            break
+            if job["error"] in {"incomplete_multipart_archive", "multipart_first_volume_required"}:
+                self._issues.pop((job["path"], job["error"]), None)
+                job["error"] = None
+            job["phase"] = "ready"
+            self._save(job)
+        for job in tuple(self._pending.values()):
+            if self.stop.is_set() or self.pipeline.cancel.is_set():
+                break
+            if job["phase"] == "ready":
+                part = self._archive_parts.get(job["path"])
+                if part is not None and part[1] == job["fingerprint"]:
+                    self._finish(job, "complete")
+                    continue
+                self._run_job(job)
+                break
 
     def snapshot(self) -> RunResult:
         return RunResult(

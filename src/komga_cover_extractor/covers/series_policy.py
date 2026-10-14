@@ -119,10 +119,8 @@ def _shared_stem(releases: Sequence[ReleaseSnapshot]) -> tuple[Path, ...]:
 
 def _select_release(
     releases: Sequence[ReleaseSnapshot], *, mode: Literal["first", "latest"],
-    book_artwork: Sequence[BookArtworkObservation],
 ) -> tuple[ReleaseSnapshot | None, tuple[Path, ...]]:
-    one_shots = {book.book for book in book_artwork if book.is_one_shot}
-    candidates = [release for release in releases if release.path not in one_shots and release.number.kind != "missing"]
+    candidates = [release for release in releases if release.number.kind != "missing"]
     if mode == "first":
         candidates = [release for release in candidates if release.number.contains(Decimal(1))]
         if not candidates:
@@ -189,6 +187,8 @@ def plan_series_artwork(
     if ineligible is not None:
         return ineligible
     chapter_directory = releases[0].kind == "chapter"
+    if chapter_directory and not (policy.chapter_support_toggle and policy.extract_chapter_covers):
+        return ArtworkDecision("no_match", "chapter_cover_disabled")
     source_releases: Sequence[ReleaseSnapshot] = releases
     source_artwork: Sequence[BookArtworkObservation] = observation.book_artwork
     mode: Literal["first", "latest"] = "first" if chapter_directory else policy.mode
@@ -207,9 +207,7 @@ def plan_series_artwork(
         if collision:
             return ArtworkDecision("conflict", "shared_book_sidecar_stem", candidates=collision)
         source_releases, source_artwork = volume.releases, volume.book_artwork
-    elif chapter_directory and not (policy.chapter_support_toggle and policy.extract_chapter_covers):
-        return ArtworkDecision("no_match", "chapter_cover_disabled")
-    selected, ambiguous = _select_release(source_releases, mode=mode, book_artwork=source_artwork)
+    selected, ambiguous = _select_release(source_releases, mode=mode)
     if ambiguous:
         return ArtworkDecision("ambiguous", "multiple_qualifying_releases", candidates=ambiguous)
     if selected is None:

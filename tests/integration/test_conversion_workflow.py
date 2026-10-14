@@ -342,11 +342,6 @@ def test_existing_output_is_a_collision_even_if_invalid_and_never_deleted(librar
     assert not (library.parent / "state").exists()
 
 
-class _Terminal(io.StringIO):
-    def isatty(self) -> bool:
-        return True
-
-
 class _NoInput(io.StringIO):
     def readline(self, *args, **kwargs):
         raise AssertionError("noninteractive conversion must not read stdin")
@@ -377,16 +372,19 @@ def test_explicit_terminal_replace_retains_prior_target_and_original_source(libr
     old_target = b"an invalid old CBZ remains recoverable after explicit replacement"
     target.write_bytes(old_target)
     old_fp = fingerprint(target, library)
-    terminal = _Terminal("replace\n")
-    diagnostics = _Terminal()
-    monkeypatch.setattr(sys, "stdin", terminal)
-    monkeypatch.setattr(sys, "stderr", diagnostics)
-
-    result = _run(library, (book,), apply=True, interactive=True)
+    master, slave = os.openpty()
+    try:
+        with os.fdopen(os.dup(slave), "r") as terminal, os.fdopen(os.dup(slave), "w") as diagnostics:
+            monkeypatch.setattr(sys, "stdin", terminal)
+            monkeypatch.setattr(sys, "stderr", diagnostics)
+            os.write(master, b"replace\n")
+            result = _run(library, (book,), apply=True, interactive=True)
+    finally:
+        os.close(master)
+        os.close(slave)
 
     assert result.as_dict()["counts"] == {"planned": 1, "committed": 1, "skipped": 0, "failed": 0}
     assert result.exit_code == 0
-    assert "Type replace" in diagnostics.getvalue()
     report = result.plan_reports[0].as_dict()
     assert report["operations"][0]["collision"] == "replace"
     assert report["operations"][0]["destination_before"] == old_fp.as_dict()

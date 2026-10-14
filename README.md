@@ -49,7 +49,7 @@ State belongs on supported local storage, outside protected media inputs when pr
 | `inspect-config`, `doctor` | Redacted effective configuration and local capability diagnostics |
 | `inspect` | Read selected archive metadata and source identity |
 | `extract` | Plan/apply book and eligible series artwork |
-| `convert` | Verified native archive conversion and source retention |
+| `convert` | ZIP-to-CBZ naming and verified native conversion with source retention |
 | `organize`, `duplicates` | Configured naming, folder matching, routing, ranked duplicate/upgrade decisions |
 | `missing-releases` | Local numeric gap reports |
 | `rename-lists` | Literal dictionary import and maintenance |
@@ -109,6 +109,8 @@ Literal settings migration never imports or evaluates `settings.py`. Remove reti
 Missing default series artwork is still `cover` only. `cover`/`poster` are recognized roles, not an instruction to create both. Ownership is content/journal based rather than mtime based. Encoded image formats determine filename suffix and MIME. A complete Komga URL may supply its own port with `komga_port = ''`.
 
 Bare qBittorrent hosts such as `127.0.0.1` retain the legacy HTTP default; explicit HTTP(S) URLs remain supported. Connect, read and BookWalker timeout settings are capped at 60 seconds. Recovery reports newly committed groups, so completed or cleanup-only recovery reports zero without dropping independently pending delivery.
+
+`run` keeps header correction and native conversion within download-role roots; focused commands may explicitly select library inputs. Ordinary chapter organization and artwork honor chapter-support gates. Matching uses library-only roots and folder-primary identity; ungrouped root-level downloads need an actual grouping step before intake. Unique one-shots still supply first/latest series artwork.
 
 Watch bounds active negative-cache, pending and review work. Completed journal history is retained without an automatic purge. Keep the state store and retained originals on supported local storage.
 

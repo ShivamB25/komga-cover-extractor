@@ -19,6 +19,9 @@ from PIL import Image
 
 from komga_cover_extractor.application import artwork_workflow
 from komga_cover_extractor.application.artwork_workflow import extract_artwork
+from komga_cover_extractor.application.pipeline import RunRequest
+from komga_cover_extractor.bootstrap import open_pipeline
+from komga_cover_extractor.config import Configuration, validate_config
 from komga_cover_extractor.covers.selection import CoverPolicy
 from komga_cover_extractor.covers.series_policy import SeriesCoverPolicy
 from komga_cover_extractor.domain.decisions import RunAuthorization, RunResult
@@ -29,7 +32,10 @@ from komga_cover_extractor.domain.operations import (
     OperationPlan,
     RootPermission,
 )
-from komga_cover_extractor.domain.releases import FileObservation
+from komga_cover_extractor.domain.releases import (
+    ArchivePageObservation,
+    FileObservation,
+)
 from komga_cover_extractor.infrastructure.filesystem import BOOK_SUFFIXES, fingerprint
 from komga_cover_extractor.infrastructure.state import StateStore
 from komga_cover_extractor.infrastructure.transactions import TransactionExecutor
@@ -38,6 +44,7 @@ from komga_cover_extractor.matching.classification import (
     ClassificationPolicy,
     LibraryType,
 )
+from komga_cover_extractor.matching.series import MatchingPolicy
 from komga_cover_extractor.parsing.filenames import ParsingPolicy, parse_release
 
 
@@ -87,10 +94,11 @@ def _run(tmp_path: Path, selected: tuple[Path, ...], *, apply: bool = False,
          mode: Literal["first", "latest"] = "first", webp: bool = False,
          series_policy: SeriesCoverPolicy | None = None, cover_policy: CoverPolicy | None = None,
          roots: tuple[LibraryRoot, ...] | None = None, cancel: Event | None = None,
-         catalog: LibrarySnapshot | None = None,
-         classification: ClassificationPolicy = ClassificationPolicy()) -> RunResult:
+         catalog: LibrarySnapshot | None = None, parsing: ParsingPolicy | None = None,
+         classification: ClassificationPolicy = ClassificationPolicy(),
+         matching: MatchingPolicy | None = None) -> RunResult:
     roots = (LibraryRoot(tmp_path / "library"),) if roots is None else roots
-    parsing = ParsingPolicy(chapter_support_toggle=True)
+    parsing = parsing or ParsingPolicy(chapter_support_toggle=True)
     catalog = _catalog(roots, parsing) if catalog is None else catalog
     selected_releases = tuple(release for release in catalog.releases if release.path in selected)
     assert len(selected_releases) == len(selected)
@@ -102,7 +110,7 @@ def _run(tmp_path: Path, selected: tuple[Path, ...], *, apply: bool = False,
     return extract_artwork(selected_releases, catalog, roots=roots, parsing=parsing,
                            cover_policy=covers, series_policy=series, state_dir=tmp_path / "state",
                            policy_version=version, authorization=RunAuthorization(apply=apply),
-                           cancel=cancel or Event(), classification=classification)
+                           cancel=cancel or Event(), classification=classification, matching=matching)
 
 
 def _assert_color(path: Path, color: str, image_format: str) -> None:
@@ -398,7 +406,8 @@ def test_chapter_copy_uses_unique_name_matched_volume_one_without_other_sidecars
     volume = _book(tmp_path / "library" / "Volumes" / "Series" / "Series v01.cbz")
     chapter = _book(tmp_path / "library" / "Chapters" / "Series" / "Series c001.cbz", "green")
     _book(tmp_path / "library" / "Volumes" / "Unrelated" / "Unrelated v01.cbz", "blue")
-    policy = SeriesCoverPolicy(copy_existing_volume_covers_toggle=True)
+    policy = SeriesCoverPolicy(copy_existing_volume_covers_toggle=True,
+                               chapter_support_toggle=True, extract_chapter_covers=True)
     result = _run(tmp_path, (chapter,), apply=True, series_policy=policy)
     assert (result.committed, result.failed, result.exit_code) == (1, 0, 0)
     _assert_color(chapter.parent / "cover.png", "red", "PNG")
@@ -413,7 +422,9 @@ def test_chapter_copy_never_chooses_first_of_two_name_matches(tmp_path: Path) ->
     other = _book(tmp_path / "library" / "Two" / "Series" / "Series v01.cbz", "green")
     chapter = _book(tmp_path / "library" / "Chapters" / "Series" / "Series c001.cbz")
     before = _snapshot(tmp_path)
-    result = _run(tmp_path, (chapter,), apply=True, series_policy=SeriesCoverPolicy(copy_existing_volume_covers_toggle=True))
+    result = _run(tmp_path, (chapter,), apply=True, series_policy=SeriesCoverPolicy(
+        copy_existing_volume_covers_toggle=True, chapter_support_toggle=True, extract_chapter_covers=True,
+    ))
     assert (result.committed, result.exit_code) == (0, 3)
     assert any(decision.reason == "multiple_volume_series_matches" and set(decision.candidates) == {str(first.parent), str(other.parent)} for decision in result.decisions)
     assert _snapshot(tmp_path) == before
@@ -625,7 +636,9 @@ def test_chapter_copy_with_only_volume_two_does_not_invent_a_source(tmp_path: Pa
     volume = _book(tmp_path / "library" / "Volumes" / "Series" / "Series v02.cbz")
     chapter = _book(tmp_path / "library" / "Chapters" / "Series" / "Series c001.cbz", "green")
     before = _snapshot(tmp_path)
-    result = _run(tmp_path, (chapter,), apply=True, series_policy=SeriesCoverPolicy(copy_existing_volume_covers_toggle=True))
+    result = _run(tmp_path, (chapter,), apply=True, series_policy=SeriesCoverPolicy(
+        copy_existing_volume_covers_toggle=True, chapter_support_toggle=True, extract_chapter_covers=True,
+    ))
     assert (result.planned, result.committed, result.skipped, result.exit_code) == (0, 0, 1, 0)
     assert _snapshot(tmp_path) == before
     assert not volume.with_suffix(".png").exists()
@@ -700,7 +713,8 @@ def test_unavailable_library_evidence_does_not_become_successful_chapter_copy(tm
                       available=False, reason="library_unavailable")
     before = _snapshot(tmp_path)
     result = _run(tmp_path, (chapter,), apply=True, roots=roots, catalog=catalog,
-                  series_policy=SeriesCoverPolicy(copy_existing_volume_covers_toggle=True))
+                  series_policy=SeriesCoverPolicy(copy_existing_volume_covers_toggle=True,
+                                                 chapter_support_toggle=True, extract_chapter_covers=True))
     assert (result.planned, result.committed, result.skipped, result.exit_code) == (0, 0, 1, 2)
     assert any(decision.status == "missing_dependency" and decision.reason == "library_unavailable" for decision in result.decisions)
     assert _snapshot(tmp_path) == before
@@ -722,7 +736,9 @@ def test_generation_assessment_converges_without_rewriting_identical_art(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     book = _book(tmp_path / "library" / "Series" / "Series v01.cbz")
-    assert _run(tmp_path, (book,), apply=True).committed == 1
+    request = RunRequest("extract", books=(book,), authorization=RunAuthorization(apply=True))
+    with open_pipeline(_cover_run_config(tmp_path)) as pipeline:
+        assert pipeline.run(request).committed == 1
     before = fingerprint(book.with_suffix(".png"), tmp_path / "library")
     real_extract = artwork_workflow.extract_cover
     decoded: list[Path] = []
@@ -732,16 +748,21 @@ def test_generation_assessment_converges_without_rewriting_identical_art(
         return real_extract(path, **kwargs)
 
     monkeypatch.setattr(artwork_workflow, "extract_cover", observe_decode)
-    assert _run(tmp_path, (book,), apply=True, mode="latest").skipped == 1
+    with open_pipeline(_cover_run_config(tmp_path, use_latest_volume_cover_as_series_cover=True)) as pipeline:
+        unchanged = pipeline.run(request)
+    assert (unchanged.committed, unchanged.skipped, unchanged.exit_code) == (0, 1, 0)
     assert decoded == []
-    changed = CoverPolicy(ArchivePolicy(), cover_patterns=("a-new-configured-pattern",))
-    assessed = _run(tmp_path, (book,), apply=True, mode="latest", cover_policy=changed)
-    assert (assessed.committed, assessed.skipped, assessed.exit_code) == (0, 1, 0)
-    assert decoded == [book]
-    decoded.clear()
-    repeated = _run(tmp_path, (book,), apply=True, mode="latest", cover_policy=changed)
-    assert (repeated.committed, repeated.skipped, repeated.exit_code) == (0, 1, 0)
-    assert decoded == []
+    changed = _cover_run_config(
+        tmp_path, use_latest_volume_cover_as_series_cover=True, cover_patterns=["a-new-configured-pattern"],
+    )
+    with open_pipeline(changed) as pipeline:
+        assessed = pipeline.run(request)
+        assert (assessed.committed, assessed.skipped, assessed.exit_code) == (0, 1, 0)
+        assert decoded == [book]
+        decoded.clear()
+        repeated = pipeline.run(request)
+        assert (repeated.committed, repeated.skipped, repeated.exit_code) == (0, 1, 0)
+        assert decoded == []
     assert fingerprint(book.with_suffix(".png"), tmp_path / "library") == before
 
 
@@ -755,3 +776,373 @@ def test_artwork_uses_supplied_classification_for_restricted_root(tmp_path: Path
     assert (result.committed, result.failed, result.exit_code) == (1, 0, 0)
     _assert_color(book.with_suffix(".png"), "red", "PNG")
     _assert_color(book.parent / "cover.png", "red", "PNG")
+
+
+@pytest.mark.parametrize("mode", ["first", "latest"])
+def test_unique_one_shot_epub_publishes_book_and_series_art(tmp_path: Path, mode: Literal["first", "latest"]) -> None:
+    book = tmp_path / "library" / "Series" / "Series.epub"
+    book.parent.mkdir(parents=True)
+    red = _raster("red")
+    with zipfile.ZipFile(book, "w") as archive:
+        archive.writestr("mimetype", b"application/epub+zip")
+        archive.writestr("META-INF/container.xml", b'<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>')
+        archive.writestr("OPS/package.opf", b'<package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata/><manifest><item id="front" href="front.png" media-type="image/png" properties="cover-image"/></manifest></package>')
+        archive.writestr("OPS/front.png", red)
+    original = book.read_bytes()
+    preview = _run(tmp_path, (book,), mode=mode)
+    assert (preview.planned, preview.committed, preview.exit_code) == (1, 0, 0)
+    assert sorted(path.name for path in book.parent.iterdir()) == ["Series.epub"]
+    assert not (tmp_path / "state").exists()
+    applied = _run(tmp_path, (book,), mode=mode, apply=True)
+    assert (applied.committed, applied.failed, applied.exit_code) == (1, 0, 0)
+    assert sorted(path.name for path in book.parent.iterdir()) == ["Series.epub", "Series.png", "cover.png"]
+    assert book.with_suffix(".png").read_bytes() == red
+    assert (book.parent / "cover.png").read_bytes() == red
+    assert book.read_bytes() == original
+
+
+@pytest.mark.parametrize(("threshold", "copied"), [(None, True), (0.979, True), (1.0, False)])
+def test_chapter_copy_honors_configured_similarity_threshold(
+    tmp_path: Path, threshold: float | None, copied: bool,
+) -> None:
+    chapter_name = "Extremely Long Distinctive Adventure Saga Example Story Alpha"
+    volume_name = "Extremely Long Distinctive Adventure Saga Example Story Alphi"
+    volume = _book(tmp_path / "library" / "Volumes" / volume_name / (volume_name + " v01.cbz"))
+    chapter = _book(tmp_path / "library" / "Chapters" / chapter_name / (chapter_name + " c001.cbz"), "green")
+    roots = (LibraryRoot(tmp_path / "library" / "Volumes"), LibraryRoot(tmp_path / "library" / "Chapters"))
+    original_volume, original_chapter = volume.read_bytes(), chapter.read_bytes()
+    matching = MatchingPolicy(required_similarity_score=threshold) if threshold is not None else None
+    result = _run(
+        tmp_path, (chapter,), apply=True, roots=roots, matching=matching,
+        cover_policy=CoverPolicy(ArchivePolicy(), chapter_support_toggle=True, extract_chapter_covers=True),
+        series_policy=SeriesCoverPolicy(copy_existing_volume_covers_toggle=True,
+                                       chapter_support_toggle=True, extract_chapter_covers=True),
+    )
+    assert (result.committed, result.failed, result.exit_code) == (1, 0, 0)
+    assert chapter.with_suffix(".png").read_bytes() == _raster("green")
+    if copied:
+        assert (chapter.parent / "cover.png").read_bytes() == _raster("red")
+        provenance = StateStore(tmp_path / "state").committed_artifact(chapter.parent / "cover.png")
+        assert provenance is not None and provenance.source == fingerprint(volume, roots[0].path)
+    else:
+        assert not (chapter.parent / "cover.png").exists()
+        assert any(decision.reason == "volume_series_match_required" for decision in result.decisions)
+    assert not volume.with_suffix(".png").exists()
+    assert volume.read_bytes() == original_volume
+    assert chapter.read_bytes() == original_chapter
+
+
+def test_fuzzy_chapter_copy_keeps_two_eligible_volume_series_ambiguous(tmp_path: Path) -> None:
+    prefix = "Extremely Long Distinctive Adventure Saga Example Story "
+    first = _book(tmp_path / "library" / "One" / (prefix + "Alphi") / (prefix + "Alphi v01.cbz"))
+    other = _book(tmp_path / "library" / "Two" / (prefix + "Alpho") / (prefix + "Alpho v01.cbz"), "blue")
+    chapter = _book(tmp_path / "library" / "Chapters" / (prefix + "Alpha") / (prefix + "Alpha c001.cbz"), "green")
+    original_first, original_other, original_chapter = first.read_bytes(), other.read_bytes(), chapter.read_bytes()
+    result = _run(
+        tmp_path, (chapter,), apply=True,
+        matching=MatchingPolicy(required_similarity_score=0.979),
+        cover_policy=CoverPolicy(ArchivePolicy(), chapter_support_toggle=True, extract_chapter_covers=True),
+        series_policy=SeriesCoverPolicy(copy_existing_volume_covers_toggle=True,
+                                       chapter_support_toggle=True, extract_chapter_covers=True),
+    )
+    assert (result.committed, result.failed, result.exit_code) == (1, 0, 3)
+    assert any(decision.reason == "multiple_volume_series_matches" and
+               set(decision.candidates) == {str(first.parent), str(other.parent)} for decision in result.decisions)
+    assert chapter.with_suffix(".png").read_bytes() == _raster("green")
+    assert not (chapter.parent / "cover.png").exists()
+    assert first.read_bytes() == original_first and other.read_bytes() == original_other
+    assert chapter.read_bytes() == original_chapter
+
+
+@pytest.mark.parametrize(("page_count", "first_gray"), [(85, False), (90, True)])
+@pytest.mark.parametrize(("support", "extract"), [(False, False), (True, False), (False, True), (True, True)])
+def test_archive_inferred_chapter_rechecks_both_publication_gates(
+    tmp_path: Path, page_count: int, first_gray: bool, support: bool, extract: bool,
+) -> None:
+    book = tmp_path / "library" / "Series" / "Series Special.cbz"
+    book.parent.mkdir(parents=True)
+    first_page = _raster("gray" if first_gray else "red")
+    with zipfile.ZipFile(book, "w") as archive:
+        archive.writestr("000.png", first_page)
+        for index in range(1, page_count):
+            archive.writestr(f"{index:03}.png", _raster("red"))
+    original = book.read_bytes()
+    before = _snapshot(tmp_path)
+    result = _run(
+        tmp_path, (book,), apply=True, parsing=ParsingPolicy(chapter_support_toggle=support),
+        cover_policy=CoverPolicy(ArchivePolicy(), chapter_support_toggle=support, extract_chapter_covers=extract),
+        series_policy=SeriesCoverPolicy(chapter_support_toggle=support, extract_chapter_covers=extract),
+    )
+    assert len(result.releases) == 1 and result.releases[0].kind == "chapter"
+    if support and extract:
+        assert (result.committed, result.failed, result.exit_code) == (1, 0, 0)
+        assert book.with_suffix(".png").read_bytes() == first_page
+    else:
+        assert (result.planned, result.committed, result.skipped, result.exit_code) == (0, 0, 1, 0)
+        assert any(decision.reason == "chapter_cover_disabled" for decision in result.decisions)
+        assert _snapshot(tmp_path) == before
+        assert not (tmp_path / "state").exists()
+    assert book.read_bytes() == original
+
+
+def test_pre_fix_artwork_assessment_cannot_bypass_archive_chapter_gates(tmp_path: Path) -> None:
+    book = tmp_path / "library" / "Series" / "Series Special.cbz"
+    book.parent.mkdir(parents=True)
+    red = _raster("red")
+    with zipfile.ZipFile(book, "w") as archive:
+        for index in range(85):
+            archive.writestr(f"{index:03}.png", red)
+    sidecar = book.with_suffix(".png")
+    _owned_image(tmp_path, book, sidecar, red)
+    root = tmp_path / "library"
+    covers = CoverPolicy(ArchivePolicy())
+    old_generation = sha256(json.dumps(
+        {"rule_version": 1, "policy": covers.as_dict()}, sort_keys=True,
+        ensure_ascii=False, separators=(",", ":"),
+    ).encode("utf-8")).hexdigest()
+    StateStore(tmp_path / "state").record_artifact_assessment(
+        fingerprint(sidecar, root), fingerprint(book, root), old_generation,
+        authorization=RunAuthorization(apply=True),
+    )
+    before = _snapshot(tmp_path)
+    result = _run(tmp_path, (book,), apply=True, parsing=ParsingPolicy(), cover_policy=covers)
+    assert (result.planned, result.committed, result.skipped, result.exit_code) == (0, 0, 1, 0)
+    assert len(result.releases) == 1 and result.releases[0].kind == "chapter"
+    assert any(decision.reason == "chapter_cover_disabled" for decision in result.decisions)
+    assert sidecar.read_bytes() == red
+    assert not (book.parent / "cover.png").exists()
+    assert _snapshot(tmp_path) == before
+
+
+def test_fully_observed_chapter_keeps_its_classification_when_covers_are_disabled(tmp_path: Path) -> None:
+    book = tmp_path / "library" / "Series" / "Series Special.cbz"
+    book.parent.mkdir(parents=True)
+    red = _raster("red")
+    with zipfile.ZipFile(book, "w") as archive:
+        for index in range(85):
+            archive.writestr(f"{index:03}.png", red)
+    roots = (LibraryRoot(tmp_path / "library"),)
+    parsing = ParsingPolicy()
+    catalog = _catalog(roots, parsing)
+    observation = replace(catalog.releases[0].observation, archive_pages=tuple(
+        ArchivePageObservation(f"{index:03}.png", False if index == 0 else None)
+        for index in range(85)
+    ))
+    catalog = replace(catalog, releases=(parse_release(observation, parsing),))
+    before = _snapshot(tmp_path)
+    result = _run(tmp_path, (book,), apply=True, roots=roots, parsing=parsing, catalog=catalog)
+    assert (result.planned, result.committed, result.skipped, result.exit_code) == (0, 0, 1, 0)
+    assert len(result.releases) == 1 and result.releases[0].kind == "chapter"
+    assert result.releases[0].observation.archive_pages == observation.archive_pages
+    assert _snapshot(tmp_path) == before
+
+
+def _cover_run_config(tmp_path: Path, *, overlap: bool = False, **overrides: object) -> Configuration:
+    library = str(tmp_path / "library")
+    values: dict[str, object] = {
+        "paths": [library], "download_folders": [library] if overlap else [],
+        "state_dir": str(tmp_path / "state"), "log_dir": str(tmp_path / "logs"),
+        "correct_file_extensions_toggle": False, "convert_to_cbz_toggle": False,
+        "delete_unacceptable_files_toggle": False, "delete_chapters_from_downloads_toggle": False,
+        "rename_files_in_download_folders_toggle": False,
+        "create_folders_for_items_in_download_folder_toggle": False,
+        "check_for_duplicate_volumes_toggle": False, "check_for_existing_series_toggle": False,
+        "rename_dirs_in_download_folder_toggle": False, "move_series_to_correct_library_toggle": False,
+        "generate_release_group_list_toggle": False, "extract_covers_toggle": True,
+        "check_for_missing_volumes_toggle": False, "bookwalker_check": False,
+        "manual_rename": False, "manual_delete": False, "log_to_file": False,
+        "match_through_image_similarity": False, "match_through_identifiers": False,
+        "compare_detected_cover_to_blank_images": False,
+        "output_covers_as_webp": False, "compress_image_option": False,
+        "discord_webhook_url": [], "bookwalker_webhook_urls": [], "new_volume_webhook": "",
+        "send_scan_request_to_komga_libraries_toggle": False, "library_types": [],
+    }
+    values.update(overrides)
+    return validate_config(values, base_dir=tmp_path)
+
+
+@pytest.mark.parametrize("overlap", [False, True])
+@pytest.mark.parametrize(("threshold", "copied"), [(0.979, True), (1.0, False)])
+def test_public_run_chapter_copy_uses_matching_policy_in_both_artwork_stages(
+    tmp_path: Path, threshold: float, copied: bool, overlap: bool,
+) -> None:
+    prefix = "Extremely Long Distinctive Adventure Saga Example Story "
+    volume = _book(tmp_path / "library" / "Volumes" / (prefix + "Alphi") / (prefix + "Alphi v01.cbz"))
+    chapter = _book(tmp_path / "library" / "Chapters" / (prefix + "Alpha") / (prefix + "Alpha c001.cbz"), "green")
+    volume_bytes, chapter_bytes = volume.read_bytes(), chapter.read_bytes()
+    config = _cover_run_config(
+        tmp_path, overlap=overlap, required_similarity_score=threshold,
+        chapter_support_toggle=True, extract_chapter_covers=True,
+        copy_existing_volume_covers_toggle=True,
+    )
+    with open_pipeline(config) as pipeline:
+        result = pipeline.run(RunRequest("run", books=(chapter,), authorization=RunAuthorization(apply=True)))
+    assert (result.committed, result.failed, result.exit_code) == (1, 0, 0)
+    assert chapter.with_suffix(".png").read_bytes() == _raster("green")
+    if copied:
+        assert (chapter.parent / "cover.png").read_bytes() == _raster("red")
+        provenance = StateStore(tmp_path / "state").committed_artifact(chapter.parent / "cover.png")
+        assert provenance is not None and provenance.source == fingerprint(volume, tmp_path / "library")
+    else:
+        assert not (chapter.parent / "cover.png").exists()
+        assert any(decision.reason == "volume_series_match_required" for decision in result.decisions)
+    assert not volume.with_suffix(".png").exists()
+    assert volume.read_bytes() == volume_bytes and chapter.read_bytes() == chapter_bytes
+
+
+@pytest.mark.parametrize("latest", [False, True])
+@pytest.mark.parametrize(("name", "page_count", "first_gray", "kind", "series_cover"), [
+    ("Series Special.cbz", 85, False, "chapter", False),
+    ("Series Special.cbz", 90, True, "chapter", False),
+    ("Series Special.cbz", 90, False, "volume", False),
+    ("Series.cbz", 90, False, "volume", True),
+])
+def test_public_run_uses_effective_archive_kind_before_artwork_publication(
+    tmp_path: Path, name: str, page_count: int, first_gray: bool, kind: str,
+    series_cover: bool, latest: bool,
+) -> None:
+    book = tmp_path / "library" / "Series" / name
+    book.parent.mkdir(parents=True)
+    first_page = _raster("gray" if first_gray else "red")
+    with zipfile.ZipFile(book, "w") as archive:
+        archive.writestr("000.png", first_page)
+        for index in range(1, page_count):
+            archive.writestr(f"{index:03}.png", _raster("red"))
+    original = book.read_bytes()
+    config = _cover_run_config(
+        tmp_path, chapter_support_toggle=False, extract_chapter_covers=False,
+        use_latest_volume_cover_as_series_cover=latest,
+    )
+    before = _snapshot(tmp_path)
+    with open_pipeline(config) as pipeline:
+        result = pipeline.run(RunRequest("run", books=(book,), authorization=RunAuthorization(apply=True)))
+    assert result.failed == 0 and result.exit_code == 0
+    assert len(result.releases) == 1 and result.releases[0].kind == kind
+    if kind == "chapter":
+        assert result.committed == 0
+        assert _snapshot(tmp_path) == before
+        assert not (tmp_path / "state").exists()
+    else:
+        assert result.committed == 1
+        expected_files = [book.name, book.with_suffix(".png").name]
+        if series_cover:
+            expected_files.append("cover.png")
+            assert (book.parent / "cover.png").read_bytes() == first_page
+            assert "classification:one_shot" in result.releases[0].provenance
+        else:
+            assert result.releases[0].number.kind == "missing"
+        assert sorted(path.name for path in book.parent.iterdir()) == sorted(expected_files)
+        assert book.with_suffix(".png").read_bytes() == first_page
+    assert book.read_bytes() == original
+
+
+@pytest.mark.parametrize("public", [False, True], ids=["filename-only-caller", "public-extract"])
+def test_changed_chapter_page_threshold_cannot_reuse_volume_artwork_assessment(
+    tmp_path: Path, public: bool,
+) -> None:
+    book = tmp_path / "library" / "Series" / "Series.cbz"
+    book.parent.mkdir(parents=True)
+    red = _raster("red")
+    with zipfile.ZipFile(book, "w") as archive:
+        for index in range(90):
+            archive.writestr(f"{index:03}.png", red)
+    root = tmp_path / "library"
+    original = fingerprint(book, root)
+    config = _cover_run_config(
+        tmp_path, average_chapter_image_count=85,
+        chapter_support_toggle=False, extract_chapter_covers=False,
+    )
+    request = RunRequest("extract", books=(book,), authorization=RunAuthorization(apply=True))
+    with open_pipeline(config) as pipeline:
+        first = pipeline.run(request)
+    assert (first.committed, first.failed, first.exit_code) == (1, 0, 0)
+    assert len(first.releases) == 1 and first.releases[0].kind == "volume"
+    sidecar = book.with_suffix(".png")
+    sidecar_source = fingerprint(sidecar, root)
+    store = StateStore(tmp_path / "state")
+    recorded = store.committed_artifact(sidecar)
+    assert recorded is not None and recorded.source == original
+    assert (book.parent / "cover.png").read_bytes() == red
+    (book.parent / "cover.png").unlink()
+    before = _snapshot(tmp_path)
+    if public:
+        config = _cover_run_config(
+            tmp_path, average_chapter_image_count=100,
+            chapter_support_toggle=False, extract_chapter_covers=False,
+        )
+        with open_pipeline(config) as pipeline:
+            result = pipeline.run(request)
+    else:
+        result = _run(tmp_path, (book,), apply=True, parsing=ParsingPolicy(
+            average_chapter_image_count=100, chapter_support_toggle=False,
+        ))
+    assert (result.planned, result.committed, result.skipped, result.failed, result.exit_code) == (0, 0, 1, 0, 0)
+    assert len(result.releases) == 1 and result.releases[0].kind == "chapter"
+    assert any(decision.reason == "chapter_cover_disabled" for decision in result.decisions)
+    assert fingerprint(book, root) == original
+    assert fingerprint(sidecar, root) == sidecar_source and sidecar.read_bytes() == red
+    assert not (book.parent / "cover.png").exists()
+    assert _snapshot(tmp_path) == before
+
+
+@pytest.mark.parametrize("volume_role", [None, "library", "both"], ids=["download-only", "library", "dual-role"])
+def test_public_extract_chapter_copy_uses_only_library_role_volume_evidence(
+    tmp_path: Path, volume_role: str | None,
+) -> None:
+    chapter = _book(tmp_path / "library" / "Chapters" / "Series" / "Series c001.cbz", "green")
+    pending = _book(tmp_path / "downloads" / "Series" / "Series v01.cbz", "blue")
+    pending_source = fingerprint(pending, tmp_path / "downloads")
+    chapter_source = fingerprint(chapter, tmp_path / "library")
+    volume = None
+    paths = [str(tmp_path / "library")]
+    downloads = [str(tmp_path / "downloads")]
+    if volume_role is not None:
+        volume = _book(tmp_path / "volumes" / "Series" / "Series v01.cbz", "red")
+        paths.append(str(tmp_path / "volumes"))
+        if volume_role == "both":
+            downloads.append(str(tmp_path / "volumes"))
+    config = _cover_run_config(
+        tmp_path, paths=paths, download_folders=downloads,
+        chapter_support_toggle=True, extract_chapter_covers=True,
+        copy_existing_volume_covers_toggle=True,
+    )
+    with open_pipeline(config) as pipeline:
+        result = pipeline.run(RunRequest("extract", books=(chapter,), authorization=RunAuthorization(apply=True)))
+    assert (result.committed, result.failed, result.exit_code) == (1, 0, 0)
+    assert len(result.releases) == 1 and result.releases[0].kind == "chapter"
+    assert chapter.with_suffix(".png").read_bytes() == _raster("green")
+    if volume is None:
+        assert any(decision.reason == "volume_series_match_required" for decision in result.decisions)
+        assert not (chapter.parent / "cover.png").exists()
+    else:
+        assert (chapter.parent / "cover.png").read_bytes() == _raster("red")
+        record = StateStore(tmp_path / "state").committed_artifact(chapter.parent / "cover.png")
+        assert record is not None and record.source == fingerprint(volume, tmp_path / "volumes")
+        assert not volume.with_suffix(".png").exists()
+    assert fingerprint(pending, tmp_path / "downloads") == pending_source
+    assert fingerprint(chapter, tmp_path / "library") == chapter_source
+    assert not pending.with_suffix(".png").exists()
+    assert sorted(path.name for path in pending.parent.iterdir()) == [pending.name]
+
+
+@pytest.mark.parametrize("command", ["extract", "run"])
+@pytest.mark.parametrize(("support", "extract"), [(False, False), (True, False), (False, True)])
+def test_public_chapter_gates_block_volume_copy_before_any_publication(
+    tmp_path: Path, command: str, support: bool, extract: bool,
+) -> None:
+    volume = _book(tmp_path / "library" / "Volumes" / "Series" / "Series v01.cbz", "red")
+    chapter = _book(tmp_path / "library" / "Chapters" / "Series" / "Series c001.cbz", "green")
+    config = _cover_run_config(
+        tmp_path, chapter_support_toggle=support, extract_chapter_covers=extract,
+        copy_existing_volume_covers_toggle=True,
+    )
+    before = _snapshot(tmp_path)
+    with open_pipeline(config) as pipeline:
+        result = pipeline.run(RunRequest(command, books=(chapter,), authorization=RunAuthorization(apply=True)))
+    assert (result.planned, result.committed, result.failed, result.exit_code) == (0, 0, 0, 0)
+    observed_chapter = next(release for release in result.releases if release.path == chapter)
+    assert observed_chapter.kind == "chapter"
+    assert any(decision.reason == "chapter_cover_disabled" for decision in result.decisions)
+    assert not chapter.with_suffix(".png").exists() and not (chapter.parent / "cover.png").exists()
+    assert not volume.with_suffix(".png").exists()
+    assert _snapshot(tmp_path) == before and not (tmp_path / "state").exists()

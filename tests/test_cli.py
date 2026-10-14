@@ -216,7 +216,7 @@ def test_inspect_cli_reports_parsed_release_without_writing_state(tmp_path: Path
 def test_inspect_isolates_invalid_part_without_losing_valid_book(tmp_path: Path) -> None:
     import zipfile
 
-    books = (tmp_path / "Series v01 Part 0.cbz", tmp_path / "Series v02.cbz")
+    books = (tmp_path / "Series c001x1.2.3.cbz", tmp_path / "Series v02.cbz")
     for book in books:
         with zipfile.ZipFile(book, "w") as archive:
             archive.writestr("ComicInfo.xml", "<ComicInfo/>")

@@ -389,12 +389,17 @@ def plan_projected_artwork(
     directories: Sequence[Path], previous_plans: Sequence[OperationPlan], state_dir: Path,
     policy_version: str, workspace: ArtworkWorkspace, cancel: Event, convert_native: bool = False,
     before: Sequence[ReleaseSnapshot] = (),
+    matching: MatchingPolicy | None = None,
 ) -> RunResult:
     """Use current paths for selection and retain pre-change identities for ownership."""
     known = {release_source(release).path: release for release in catalog.releases}
     known.update((release_source(release).path, release) for release in selected)
     locations = virtual_file_locations(files, previous_plans)
     store = StateStore(state_dir)
+    name_matching = replace(
+        matching or MatchingPolicy(), match_through_image_similarity=False,
+        match_through_identifiers=False, classification=classification,
+    )
     original_books = {release_source(release).path: replace(
         release, observation=replace(release.observation, path=release_source(release).path),
     ) for release in (*before, *known.values())}
@@ -441,6 +446,10 @@ def plan_projected_artwork(
             return source_images[source.path]
         if cancel.is_set():
             raise WorkerError("shutdown_requested", "cancelled")
+        if release.kind == "chapter" and not (cover_policy.chapter_support_toggle and cover_policy.extract_chapter_covers):
+            decisions.append(Decision("no_match", "chapter_cover_disabled", release.path))
+            source_images[source.path] = None
+            return None
         with open_book_bytes(release, previous_plans, policy=cover_policy, cancel=cancel, convert_native=convert_native) as byte_source:
             extracted = extract_cover(byte_source.path, root=byte_source.root, policy=cover_policy,
                                       output=FileOutputPolicy(), release_kind=release.kind, cancel=cancel)
@@ -457,6 +466,10 @@ def plan_projected_artwork(
         parsed = parse_release(observation, parsing)
         releases[source.path] = replace(parsed, provenance=tuple(dict.fromkeys((*parsed.provenance, "archive:observed"))))
         decisions.extend(Decision("observed", reason, release.path) for reason in extracted.diagnostics)
+        if parsed.kind == "chapter" and not (cover_policy.chapter_support_toggle and cover_policy.extract_chapter_covers):
+            decisions.append(Decision("no_match", "chapter_cover_disabled", release.path))
+            source_images[source.path] = None
+            return None
         if extracted.status == "absent":
             decisions.append(Decision("no_match", extracted.reason, release.path))
             source_images[source.path] = None
@@ -512,6 +525,7 @@ def plan_projected_artwork(
                 decisions.append(Decision("no_match", suitable.reason, release.path))
                 continue
             load(release, sidecar=True)
+        members = tuple(releases[release_source(release).path] for release in members)
         book_images = tuple(BookArtworkObservation(release.path, tuple(image for image in images.values()
                             if image.path.parent == release.parent and image.path.stem == release.stem),
                             "classification:one_shot" in release.provenance) for release in members)
@@ -526,11 +540,9 @@ def plan_projected_artwork(
                 decisions.append(Decision("missing_dependency", catalog.reason or "library_unavailable", folder))
                 continue
             probe = replace(members[0], kind="volume", number=ReleaseNumber.missing(), identifiers=())
-            volumes = tuple(release for release in known.values() if release.kind == "volume"
+            volumes = tuple(release for release in releases.values() if release.kind == "volume"
                             and release.observation.root_role in {"library", "both"})
-            matched = match_series(probe, LibrarySnapshot(volumes, roots), MatchingPolicy(
-                required_similarity_score=1.0, required_matching_percentage=100.0,
-                match_through_image_similarity=False, match_through_identifiers=False, classification=classification))
+            matched = match_series(probe, LibrarySnapshot(volumes, roots), name_matching)
             if matched.status != "matched" or matched.selected is None:
                 decisions.append(Decision("ambiguous" if matched.status == "ambiguous" else "no_match",
                                           "multiple_volume_series_matches" if matched.status == "ambiguous" else "volume_series_match_required",
@@ -546,19 +558,23 @@ def plan_projected_artwork(
         if strategy.reason == "selected_book_artwork_absent" and strategy.selected_release is not None:
             chosen = strategy.selected_release
             source_root = next(root for root in roots if root.contains(chosen.path))
-            source_members = tuple(release for release in known.values() if release.parent == chosen.parent)
+            source_members = tuple(release for release in releases.values() if release.parent == chosen.parent)
             suitable = check_root_suitability((chosen,), source_root, classification, classification_files=source_members)
             if suitable.status != "suitable":
                 decisions.append(Decision("no_match", suitable.reason, folder))
                 continue
             image = load(chosen, sidecar=release_source(chosen).path in selected_sources)
             if image is not None:
+                chosen = releases[release_source(chosen).path]
+                members = tuple(releases[release_source(release).path] for release in members)
                 chosen_book = BookArtworkObservation(chosen.path, (image,), "classification:one_shot" in chosen.provenance)
                 artwork_observation = policy.observation
                 assert artwork_observation is not None
                 if artwork_observation.matched_volume_series:
                     volume = artwork_observation.matched_volume_series[0]
-                    volume = replace(volume, book_artwork=tuple(chosen_book if book.book == chosen.path else book for book in volume.book_artwork))
+                    volume = replace(volume,
+                                     releases=tuple(chosen if release.path == chosen.path else release for release in volume.releases),
+                                     book_artwork=tuple(chosen_book if book.book == chosen.path else book for book in volume.book_artwork))
                     policy = replace(policy, observation=replace(artwork_observation, matched_volume_series=(volume,)))
                 else:
                     policy = replace(policy, observation=replace(artwork_observation,

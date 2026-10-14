@@ -2,6 +2,7 @@
 import io
 import zipfile
 from dataclasses import replace
+from decimal import Decimal
 from html import escape
 from pathlib import Path
 from typing import Literal
@@ -9,7 +10,10 @@ from typing import Literal
 import pytest
 from PIL import Image
 
-from komga_cover_extractor.domain.releases import FileObservation
+from komga_cover_extractor.application.pipeline import RunRequest
+from komga_cover_extractor.bootstrap import open_pipeline
+from komga_cover_extractor.config import validate_config
+from komga_cover_extractor.domain.releases import FileObservation, ReleaseSnapshot
 from komga_cover_extractor.infrastructure.workers import WorkerError, run_worker
 from komga_cover_extractor.infrastructure.xml_metadata import (
     read_book_metadata,
@@ -31,6 +35,30 @@ def _jpeg(color: str) -> bytes:
     with Image.new('RGB', (8, 8), color) as image:
         image.save(output, format='JPEG')
     return output.getvalue()
+
+
+def _png(color: str) -> bytes:
+    output = io.BytesIO()
+    with Image.new('RGB', (8, 8), color) as image:
+        image.save(output, format='PNG')
+    return output.getvalue()
+
+
+def _public_inspect(book: Path, **overrides: object) -> ReleaseSnapshot:
+    values: dict[str, object] = {
+        'paths': [str(book.parent)], 'download_folders': [],
+        'state_dir': str(book.parent / 'state'), 'log_dir': str(book.parent / 'logs'),
+        'log_to_file': False, 'match_through_image_similarity': False,
+        'match_through_identifiers': False, 'compare_detected_cover_to_blank_images': False,
+        'discord_webhook_url': [], 'send_scan_request_to_komga_libraries_toggle': False,
+        'bookwalker_check': False,
+    }
+    values.update(overrides)
+    with open_pipeline(validate_config(values, base_dir=book.parent)) as pipeline:
+        result = pipeline.run(RunRequest('inspect', books=(book,)))
+    assert result.exit_code == 0
+    assert len(result.releases) == 1
+    return result.releases[0]
 
 
 def _archive(tmp_path: Path, entries: list[tuple[str, bytes]], *, comment: bytes = b'',
@@ -391,32 +419,36 @@ def test_premium_evidence_survives_missing_optional_opf_metadata(tmp_path: Path)
         assert metadata.status == 'valid' and metadata.values == (('premium', 'true'),)
 
 
-def test_inspect_worker_keeps_lexical_first_nonimage_and_all_member_evidence(tmp_path: Path) -> None:
+def test_public_inspect_keeps_metadata_and_does_not_skip_lexical_first_nonimage(tmp_path: Path) -> None:
+    gray = _jpeg('white')
     book = _archive(tmp_path, [
         ('ComicInfo.xml', b'<ComicInfo><Publisher>Press</Publisher></ComicInfo>'),
-        ('images/', b''), ('images/page.jpg', _jpeg('white')), ('z-last.jpg', _jpeg('red')),
-    ], name='Series.cbz')
-    result = run_worker('inspect', {'book': str(book), 'root': str(tmp_path),
-                                           'archive_policy': ArchivePolicy().as_dict()})
-    assert result['status'] == 'valid' and result['container'] == 'zip'
-    assert result['metadata'] == [['Publisher', 'Press']]
-    assert result['archive_pages'] == [
-        {'name': 'ComicInfo.xml', 'is_grayscale': None, 'is_directory': False},
-        {'name': 'images', 'is_grayscale': None, 'is_directory': True},
-        {'name': 'images/page.jpg', 'is_grayscale': None, 'is_directory': False},
-        {'name': 'z-last.jpg', 'is_grayscale': None, 'is_directory': False},
-    ]
+        ('images/', b''),
+        *((f'images/{index:03}.jpg', gray) for index in range(86)),
+    ], name='Series Special.cbz')
+    original = book.read_bytes()
+    release = _public_inspect(book)
+
+    assert release.publisher == 'Press'
+    assert release.kind == 'volume'
+    assert release.number.kind == 'missing'
+    assert book.read_bytes() == original
     assert list(tmp_path.iterdir()) == [book]
 
 
-def test_inspect_worker_observes_only_lexical_first_all_member_grayscale(tmp_path: Path) -> None:
-    book = _archive(tmp_path, [('01.jpg', _jpeg('white')), ('cover.jpg', _jpeg('blue'))], name='Series.cbz')
-    result = run_worker('inspect', {'book': str(book), 'root': str(tmp_path),
-                                           'archive_policy': ArchivePolicy().as_dict()})
-    assert result['archive_pages'] == [
-        {'name': '01.jpg', 'is_grayscale': True, 'is_directory': False},
-        {'name': 'cover.jpg', 'is_grayscale': None, 'is_directory': False},
-    ]
+def test_public_inspect_uses_only_the_lexical_first_image_for_grayscale(tmp_path: Path) -> None:
+    color = _jpeg('red')
+    book = _archive(tmp_path, [
+        ('000.jpg', _jpeg('white')),
+        *((f'{index:03}.jpg', color) for index in range(1, 86)),
+    ], name='Series Special.cbz')
+    original = book.read_bytes()
+    release = _public_inspect(book)
+
+    assert release.kind == 'chapter'
+    assert release.number.values == (Decimal('1'),)
+    assert release.display_series == 'Series Special'
+    assert book.read_bytes() == original
     assert list(tmp_path.iterdir()) == [book]
 
 
@@ -471,27 +503,108 @@ def test_non_authoritative_legacy_opf_metadata_is_named_without_inventing_cover_
         assert reference.status == 'absent' and reference.authoritative is False
 
 
-def test_inspect_worker_hidden_first_member_remains_unknown_not_the_next_image(tmp_path: Path) -> None:
-    book = _archive(tmp_path, [('.hidden.jpg', _jpeg('red')), ('01.jpg', _jpeg('white'))], name='Series.cbz')
-    result = run_worker('inspect', {'book': str(book), 'root': str(tmp_path),
-                                           'archive_policy': ArchivePolicy(cover_max_candidates=1).as_dict()})
-    assert result['archive_pages'] == [
-        {'name': '.hidden.jpg', 'is_grayscale': None, 'is_directory': False},
-        {'name': '01.jpg', 'is_grayscale': None, 'is_directory': False},
-    ]
+def test_public_inspect_counts_hidden_first_image_without_skipping_to_a_gray_page(tmp_path: Path) -> None:
+    gray = _jpeg('white')
+    book = _archive(tmp_path, [
+        ('.hidden.jpg', _jpeg('red')),
+        *((f'{index:03}.jpg', gray) for index in range(85)),
+    ], name='Series Special.cbz')
+    original = book.read_bytes()
+    release = _public_inspect(book, cover_max_candidates=85)
+
+    assert release.kind == 'volume'
+    assert release.number.kind == 'missing'
+    assert 'classification:one_shot' not in release.provenance
+    assert book.read_bytes() == original
+    assert list(tmp_path.iterdir()) == [book]
 
 
 def test_inspect_cover_candidate_budget_accepts_limit_and_rejects_one_more(tmp_path: Path) -> None:
-    book = _archive(tmp_path, [('01.jpg', _jpeg('white')), ('02.jpg', _jpeg('red'))], name='Series.cbz')
+    book = _archive(tmp_path, [('01.jpg', _jpeg('white')), ('02.jpg', _jpeg('red'))], name='Series Special.cbz')
     request = {'book': str(book), 'root': str(tmp_path),
                'archive_policy': ArchivePolicy(cover_max_candidates=2).as_dict()}
-    accepted = run_worker('inspect', request)
-    assert accepted['archive_pages'] == [
-        {'name': '01.jpg', 'is_grayscale': True, 'is_directory': False},
-        {'name': '02.jpg', 'is_grayscale': None, 'is_directory': False},
-    ]
+    accepted = _public_inspect(book, cover_max_candidates=2)
+    assert accepted.kind == 'chapter'
+    assert accepted.number.values == (Decimal('1'),)
     request['archive_policy'] = ArchivePolicy(cover_max_candidates=1).as_dict()
     with pytest.raises(WorkerError) as failure:
         run_worker('inspect', request)
     assert failure.value.reason == 'cover_candidate_limit'
     assert list(tmp_path.iterdir()) == [book]
+
+
+@pytest.mark.parametrize(('suffix', 'kind'), [('.png', 'chapter'), ('.PNG', 'volume')])
+def test_public_inspect_first_gray_page_suffix_retains_original_case_gate(
+    tmp_path: Path, suffix: str, kind: str,
+) -> None:
+    color = _png('red')
+    book = _archive(tmp_path, [
+        (f'000{suffix}', _png('gray')),
+        *((f'{index:03}.png', color) for index in range(1, 90)),
+    ], name='Series Special.cbz')
+    original = book.read_bytes()
+    release = _public_inspect(book)
+
+    assert release.kind == kind
+    assert release.number.kind == ('scalar' if kind == 'chapter' else 'missing')
+    if kind == 'chapter':
+        assert release.number.values == (Decimal('1'),)
+    assert book.read_bytes() == original
+    assert list(tmp_path.iterdir()) == [book]
+
+
+@pytest.mark.parametrize('first', ['.hidden.png', './z.png'])
+def test_public_inspect_reads_hidden_or_canonicalized_lexical_first_gray_image(
+    tmp_path: Path, first: str,
+) -> None:
+    color = _png('red')
+    book = _archive(tmp_path, [
+        *((f'{index:03}.png', color) for index in range(89)),
+        (first, _png('gray')),
+    ], name='Series Special.cbz')
+    original = book.read_bytes()
+    release = _public_inspect(book)
+
+    assert release.kind == 'chapter'
+    assert release.number.values == (Decimal('1'),)
+    assert release.display_series == 'Series Special'
+    assert book.read_bytes() == original
+    assert list(tmp_path.iterdir()) == [book]
+
+
+@pytest.mark.parametrize('suffix', ['.png', '.PNG'])
+@pytest.mark.parametrize('unused', [b'not a raster', b'x' * 4097], ids=['invalid-image', 'over-read-budget'])
+def test_public_inspect_epub_ignores_unselected_hidden_raw_first_raster(
+    tmp_path: Path, suffix: str, unused: bytes,
+) -> None:
+    member = 'OPS/front' + suffix
+    book = _archive(tmp_path, [
+        ('.000.png', unused), ('mimetype', b'application/epub+zip'),
+        ('META-INF/container.xml', _container('OPS/package.opf')),
+        ('OPS/package.opf', _package(
+            f'<item id="front" href="front{suffix}" media-type="image/png" properties="cover-image"/>',
+            metadata='<dc:publisher>Kadokawa</dc:publisher>',
+        )),
+        (member, _png('red')),
+    ])
+    original = book.read_bytes()
+    before = book.stat()
+    request = {'book': str(book), 'root': str(tmp_path),
+               'archive_policy': ArchivePolicy(cover_read_max_bytes=4096).as_dict()}
+    response = run_worker('inspect', request)
+    assert (response['status'], response['container'], response['metadata']) == (
+        'valid', 'epub', [['dc:publisher', 'Kadokawa']],
+    )
+    release = _public_inspect(book, cover_read_max_bytes=4096)
+    assert (release.kind, release.publisher, release.observation.metadata) == (
+        'volume', 'Kadokawa', (('dc:publisher', 'Kadokawa'),),
+    )
+    with ArchiveReader(book, ArchivePolicy()) as reader:
+        reference = resolve_epub_cover(reader)
+        assert (reference.status, reference.member, reference.authoritative) == ('found', member, True)
+        assert reader.read_member(member) == _png('red')
+    after = book.stat()
+    assert (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) == (
+        before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns,
+    )
+    assert book.read_bytes() == original and list(tmp_path.iterdir()) == [book]

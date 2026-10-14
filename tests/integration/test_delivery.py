@@ -401,6 +401,43 @@ def test_grouped_chapters_keep_zero_numeric_order_routing_and_optional_actual_co
             ]
 
 
+@pytest.mark.parametrize("include_covers", [False, True])
+def test_normal_only_chapter_notifications_keep_individual_fields_and_cover_policy(
+    tmp_path: Path, include_covers: bool,
+) -> None:
+    configured = roots(tmp_path)
+    sources = (book(configured[1], "Series c003.cbz", "blue"), book(configured[1], "Series c002.cbz", "red"))
+    originals = {source.name: source.path.read_bytes() for source in sources}
+    state = StateStore(tmp_path / "state")
+    result = commit_moves(state, configured, sources, tuple(configured[0].path / "Series" / source.name for source in sources))
+    with RecordingDiscord(new_release=False) as discord:
+        observed = settle(result, state, configured, discord=discord, before=sources, chapter_covers=include_covers)
+        chapters = [embed for _, payload, _ in discord.calls for embed in payload["embeds"]
+                    if embed["title"] == "New Chapter(s) Added"]
+        assert (observed.committed, observed.failed, observed.deferred_deliveries, observed.exit_code) == (1, 0, (), 0)
+        assert [embed["fields"] for embed in chapters] == [
+            [{"name": "Chapter Number(s)", "value": "```2```", "inline": False},
+             {"name": "Chapter Name(s)", "value": "```Series c002.cbz```", "inline": False}],
+            [{"name": "Chapter Number(s)", "value": "```3```", "inline": False},
+             {"name": "Chapter Name(s)", "value": "```Series c003.cbz```", "inline": False}],
+        ]
+        assert {channel for channel, _, _ in discord.calls} == {"discord/normal/0"}
+        files = [attachment for _, _, attachments in discord.calls for attachment in attachments]
+        if include_covers:
+            assert [(name, media) for name, _, media in files] == [
+                ("cover_1.webp", "image/webp"), ("cover_2.webp", "image/webp"),
+            ]
+            for (_, data, _), channel in zip(files, (0, 2), strict=True):
+                with Image.open(io.BytesIO(data)) as image:
+                    pixel = image.convert("RGB").getpixel((0, 0))
+                    assert (image.format, image.size) == ("WEBP", (16, 16))
+                    assert pixel[channel] > 240 and all(pixel[index] < 12 for index in range(3) if index != channel)
+        else:
+            assert files == []
+            assert all("image" not in embed for embed in chapters)
+    assert {source.name: (configured[0].path / "Series" / source.name).read_bytes() for source in sources} == originals
+
+
 def test_upgrade_uses_observed_scores_tags_sizes_and_does_not_announce_new_volume(tmp_path: Path) -> None:
     configured = roots(tmp_path)
     existing = book(configured[0], "Series v01 [Scan].cbz")

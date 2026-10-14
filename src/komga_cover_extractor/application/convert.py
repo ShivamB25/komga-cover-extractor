@@ -176,7 +176,7 @@ def _zip_info(member: ArchiveMember, *, comment: bytes = b'') -> zipfile.ZipInfo
     target_name = member.name + '/' if member.is_dir else member.name
     if len(target_name.encode('utf-8')) > ZIP_NAME_MAX_BYTES:
         raise ArchiveError('unsupported_zip_member_name', 'unsupported')
-    info = zipfile.ZipInfo(target_name)
+    info = zipfile.ZipInfo(target_name, member.modified_at) if member.modified_at is not None else zipfile.ZipInfo(target_name)
     info.create_system = 3
     info.external_attr = (stat.S_IFDIR | 0o755 if member.is_dir else stat.S_IFREG | 0o644) << 16
     if member.is_dir:

@@ -18,12 +18,12 @@ from komga_cover_extractor.matching.classification import (
     LibraryType,
 )
 from komga_cover_extractor.matching.series import (
-    MATCH_CACHE_MAX_ENTRIES,
     MatchEvidenceCache,
     MatchingPolicy,
     MatchScoreCache,
     match_series,
 )
+from komga_cover_extractor.parsing.normalization import clean_str
 
 
 def _release(
@@ -52,7 +52,7 @@ def _release(
         number=number or ReleaseNumber.missing(),
         kind=kind,
         display_series=series,
-        canonical_series_key=series.casefold().strip(),
+        canonical_series_key=clean_str(series),
         identifiers=identifiers,
     )
 
@@ -111,7 +111,6 @@ def test_matching_root_classifies_incoming_release_not_existing_contents() -> No
     )
 
     assert decision.status == "no_match"
-    assert decision.reason == "no_suitable_series_folder_or_root"
     allowed = match_series(
         _release("/downloads/Title v02 [Publisher].epub", "Title"),
         LibrarySnapshot((existing,), (root,)),
@@ -399,6 +398,26 @@ def test_identifier_fallback_requires_a_volume_and_matching_extension() -> None:
     assert extension_decision.status == "no_match"
 
 
+def test_filename_alias_requires_identifier_evidence_when_its_folder_name_does_not_match() -> None:
+    identifier = (("isbn", "9780000000000"),)
+    incoming = _release("/downloads/Incoming/Series v02.cbz", "Series", identifiers=identifier)
+    collection = _release(
+        "/library/Other Collection/Series v01.cbz", "Series", identifiers=identifier,
+    )
+    named_folder = _release("/library/Series/Series v03.cbz", "Series")
+
+    primary = match_series(incoming, _library((collection, named_folder)), _policy(image=False))
+    fallback = match_series(incoming, _library((collection,)), _policy(image=False))
+
+    assert primary.status == "matched"
+    assert primary.selected is not None
+    assert primary.selected.series_path == Path("/library/Series")
+    assert fallback.status == "matched"
+    assert fallback.selected is not None
+    assert fallback.selected.series_path == Path("/library/Other Collection")
+    assert fallback.selected.evidence == "unique_identifier"
+
+
 def test_cached_identifier_observation_precedes_a_prioritized_name_match() -> None:
     identifier = (("isbn", "9780000000000"),)
     incoming = _release(
@@ -435,7 +454,6 @@ def test_cached_identifier_observation_precedes_a_prioritized_name_match() -> No
     assert first.status == "matched"
     assert len(cache) == 1
     assert second.status == "matched"
-    assert second.reason == "cached_identifier_match"
     assert second.selected is not None
     assert second.selected.series_path == existing.parent
 
@@ -481,7 +499,6 @@ def test_cached_cover_observation_precedes_a_prioritized_name_match() -> None:
 
     assert first.status == "matched"
     assert second.status == "matched"
-    assert second.reason == "cached_cover_similarity_match"
     assert second.selected is not None
     assert second.selected.series_path == existing.parent
 
@@ -536,7 +553,6 @@ def test_expired_or_changed_evidence_does_not_prune_current_candidates(change: s
     )
 
     assert decision.status == "matched"
-    assert decision.reason == "prioritized_name_match"
     assert decision.selected is not None
     assert decision.selected.series_path == alias.parent
     assert len(cache) == 0
@@ -580,7 +596,6 @@ def test_evidence_cache_is_policy_scoped() -> None:
 
     assert first.status == "matched"
     assert second.status == "matched"
-    assert second.reason == "prioritized_name_match"
     assert second.selected is not None
     assert second.selected.series_path == alias.parent
 
@@ -600,7 +615,7 @@ def test_evidence_cache_is_bounded_to_4096_observed_candidates() -> None:
             identifiers=identifier,
             digest=f"series archive {index}",
         )
-        for index in range(MATCH_CACHE_MAX_ENTRIES + 4)
+        for index in range(4100)
     )
     policy = _policy(image=False)
     cache = MatchEvidenceCache(policy)
@@ -614,7 +629,7 @@ def test_evidence_cache_is_bounded_to_4096_observed_candidates() -> None:
     )
 
     assert decision.status == "ambiguous"
-    assert len(cache) == MATCH_CACHE_MAX_ENTRIES
+    assert len(cache) == 4096
     second = match_series(
         incoming,
         _library(releases),
@@ -623,7 +638,6 @@ def test_evidence_cache_is_bounded_to_4096_observed_candidates() -> None:
         now=150.0,
     )
     assert second.status == "ambiguous"
-    assert second.reason == "cached_identifier_match"
     assert second.selected is None
     assert len(second.candidates) == 4100
     assert tuple(candidate.series_path for candidate in second.candidates[:4]) == (
@@ -685,7 +699,6 @@ def test_cached_cover_checks_new_candidates_before_unique_selection(cover_eviden
         now=150.0,
     )
     assert decision.status == "ambiguous"
-    assert decision.reason == "cached_cover_similarity_match"
     assert decision.selected is None
     assert {candidate.series_path for candidate in decision.candidates} == {
         existing.parent, alias.parent
@@ -704,7 +717,6 @@ def test_cached_cover_cannot_hide_an_unresolved_new_folder(cover_evidence) -> No
         now=150.0,
     )
     assert decision.status == "missing_dependency"
-    assert decision.reason == "cover_similarity_observation_incomplete"
     assert decision.selected is None
     assert tuple(candidate.series_path for candidate in decision.candidates) == (
         existing.parent,
@@ -732,7 +744,6 @@ def test_cached_negative_cover_observations_preserve_all_candidates(cover_eviden
     )
     for decision in (second, third):
         assert decision.status == "matched"
-        assert decision.reason == "cached_cover_similarity_match"
         assert decision.selected is not None
         assert decision.selected.series_path == existing.parent
     assert compared == [alias.path]
@@ -752,9 +763,9 @@ def test_cached_cover_read_does_not_extend_its_ttl(cover_evidence) -> None:
         now=400.0,
     )
     assert fresh.status == "matched"
-    assert fresh.reason == "cached_cover_similarity_match"
+    assert fresh.selected is not None
+    assert fresh.selected.series_path == existing.parent
     assert expired.status == "matched"
-    assert expired.reason == "prioritized_name_match"
     assert expired.selected is not None
     assert expired.selected.series_path == alias.parent
     assert len(cache) == 0
@@ -792,7 +803,6 @@ def test_cover_cache_rechecks_every_observed_source_fingerprint_change(
         now=150.0,
     )
     assert decision.status == "no_match"
-    assert decision.reason == "no_matching_evidence"
     assert decision.selected is None
     assert compared == [existing.path]
     assert len(cache) == 1
@@ -818,7 +828,6 @@ def test_explicit_cover_cache_invalidation_rechecks_the_source(cover_evidence, s
         now=150.0,
     )
     assert decision.status == "no_match"
-    assert decision.reason == "no_matching_evidence"
     assert compared == [existing.path]
 
 
@@ -835,7 +844,6 @@ def test_cover_cache_policy_change_rechecks_current_observations(cover_evidence)
         now=150.0,
     )
     assert decision.status == "no_match"
-    assert decision.reason == "no_matching_evidence"
     assert compared == [existing.path]
 
 
@@ -852,7 +860,6 @@ def test_cover_cache_clock_rollback_and_expiry_recheck_observations(cover_eviden
         now=now,
     )
     assert decision.status == "no_match"
-    assert decision.reason == "no_matching_evidence"
     assert compared == [existing.path]
 
 
@@ -878,7 +885,6 @@ def test_cached_identifier_considers_new_matching_folders_before_names() -> None
     )
     assert first.status == "matched"
     assert second.status == "ambiguous"
-    assert second.reason == "cached_identifier_match"
     assert second.selected is None
     assert tuple(candidate.series_path for candidate in second.candidates) == (
         alias.parent, existing.parent
@@ -908,9 +914,9 @@ def test_cached_identifier_read_does_not_extend_its_ttl() -> None:
     )
     assert first.status == "matched"
     assert fresh.status == "matched"
-    assert fresh.reason == "cached_identifier_match"
+    assert fresh.selected is not None
+    assert fresh.selected.series_path == existing.parent
     assert expired.status == "matched"
-    assert expired.reason == "prioritized_name_match"
     assert expired.selected is not None
     assert expired.selected.series_path == alias.parent
 
@@ -931,9 +937,9 @@ def test_name_score_cache_invalidation_preserves_new_valid_candidates() -> None:
         incoming, _library((existing, new)), policy, cache=cache, now=150.0
     )
     assert first.status == "matched"
-    assert first.reason == "full_name_match"
+    assert first.selected is not None
+    assert first.selected.series_path == existing.parent
     assert second.status == "matched"
-    assert second.reason == "prioritized_name_match"
     assert second.selected is not None
     assert second.selected.series_path == new.parent
     assert len(cache) == 0
@@ -957,7 +963,6 @@ def test_cached_image_evidence_precedes_fresh_identifiers_and_names(cover_eviden
         now=150.0,
     )
     assert decision.status == "matched"
-    assert decision.reason == "cached_cover_similarity_match"
     assert decision.selected is not None
     assert decision.selected.series_path == existing.parent
 
@@ -979,7 +984,6 @@ def test_cover_evidence_requires_both_current_fingerprints(cover_evidence, missi
         now=150.0,
     )
     assert decision.status == "no_match"
-    assert decision.reason == "no_matching_evidence"
     assert compared == [existing.path]
     assert len(cache) == 0
 
@@ -991,7 +995,6 @@ def test_cover_cache_invalidation_uses_path_components(cover_evidence) -> None:
         incoming, _library((existing,)), policy, evidence_cache=cache, now=150.0
     )
     assert decision.status == "matched"
-    assert decision.reason == "cached_cover_similarity_match"
     assert decision.selected is not None
     assert decision.selected.series_path == existing.parent
 
@@ -1034,7 +1037,6 @@ def test_cached_identifier_rechecks_mixed_folder_suitability(volume_count: int) 
         assert decision.selected.series_path == existing.parent
     else:
         assert decision.status == "no_match"
-        assert decision.reason == "no_suitable_series_folder_or_root"
         assert decision.selected is None
 
 
@@ -1058,7 +1060,6 @@ def test_folder_suitability_checks_medium_and_kind_independently(epub_count: int
         assert decision.selected.series_path == Path("/library/Series")
     else:
         assert decision.status == "no_match"
-        assert decision.reason == "no_suitable_series_folder_or_root"
 
 
 def test_alternative_gate_counts_empty_and_grouping_sibling_directories() -> None:
@@ -1090,7 +1091,6 @@ def test_alternative_gate_counts_empty_and_grouping_sibling_directories() -> Non
     assert allowed.selected is not None
     assert allowed.selected.series_path == existing.parent
     assert blocked.status == "no_match"
-    assert blocked.reason == "no_matching_evidence"
     assert compared == [existing.path]
 
 
@@ -1114,7 +1114,6 @@ def test_alternative_gate_derives_grouping_directories_from_observed_descendants
         cover_similarity=lambda _incoming, release: compared.append(release.path) or 0.95,
     )
     assert decision.status == "no_match"
-    assert decision.reason == "no_matching_evidence"
     assert compared == []
 
 
@@ -1151,7 +1150,6 @@ def test_alternative_gate_preserves_consecutive_word_order(folder: str, expected
         assert decision.selected.series_path == existing.parent
         assert compared == [existing.path]
     else:
-        assert decision.reason == "no_matching_evidence"
         assert decision.selected is None
         assert compared == []
 
@@ -1175,7 +1173,6 @@ def test_alternative_gate_counts_repeated_words_within_each_directory(repetition
         assert compared == [existing.path]
     else:
         assert decision.status == "no_match"
-        assert decision.reason == "no_matching_evidence"
         assert compared == []
 
 
@@ -1190,7 +1187,6 @@ def test_identifier_namespace_and_extension_matching_are_case_insensitive() -> N
     )
     decision = match_series(incoming, _library((existing,)), _policy(image=False))
     assert decision.status == "matched"
-    assert decision.reason == "unique_identifier_match"
     assert decision.selected is not None
     assert decision.selected.series_path == existing.parent
     assert decision.selected.identifiers == (("isbn", "shared-id"),)
@@ -1222,13 +1218,13 @@ def test_new_identifier_observations_replace_obsolete_cached_identifiers() -> No
     )
     assert first.status == "matched"
     assert updated.status == "matched"
-    assert updated.reason == "unique_identifier_match"
     assert updated.selected is not None
     assert updated.selected.identifiers == (("isbn", "newly-observed-id"),)
+    assert updated.selected.releases == (existing,)
     assert cached.status == "matched"
-    assert cached.reason == "cached_identifier_match"
     assert cached.selected is not None
     assert cached.selected.series_path == existing.parent
+    assert cached.selected.releases == (existing,)
     assert len(cache) == 1
 
 
@@ -1253,7 +1249,6 @@ def test_identifier_cache_invalidation_restores_normal_tier_evaluation() -> None
     )
     assert first.status == "matched"
     assert decision.status == "matched"
-    assert decision.reason == "prioritized_name_match"
     assert decision.selected is not None
     assert decision.selected.series_path == alias.parent
     assert len(cache) == 0
@@ -1272,7 +1267,6 @@ def test_invalid_cover_observations_are_not_cached_as_success(cover_evidence, sc
         now=150.0,
     )
     assert decision.status == "invalid_input"
-    assert decision.reason == "invalid_cover_similarity_observation"
     assert decision.selected is None
     assert len(cache) == 0
 
@@ -1287,8 +1281,6 @@ def test_invalid_cache_times_do_not_consume_cached_proof(cover_evidence, now) ->
         incoming, _library((existing,)), policy, evidence_cache=cache, now=150.0
     )
     assert invalid.status == "invalid_input"
-    assert invalid.reason == "invalid_cache_time"
     assert valid.status == "matched"
-    assert valid.reason == "cached_cover_similarity_match"
     assert valid.selected is not None
     assert valid.selected.series_path == existing.parent

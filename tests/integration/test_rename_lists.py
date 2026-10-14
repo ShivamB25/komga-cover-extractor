@@ -677,25 +677,28 @@ def test_changed_existing_dictionary_is_not_replaced_by_an_outdated_append(tmp_p
     assert StateStore(state).list_operations() == ()
 
 
-def test_source_mutation_during_bounded_read_is_a_stale_observation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_replaced_dictionary_during_observation_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     state = _root(tmp_path)
     target = state / "release_groups.txt"
     target.write_bytes(b"Original\n")
+    before = target.stat()
+    replacement = state / "replacement.txt"
+    replacement.write_bytes(b"Modified\n")
     actual_fstat = rename_lists.os.fstat
-    calls = 0
 
-    def change_after_read(descriptor: int) -> os.stat_result:
-        nonlocal calls
-        calls += 1
-        if calls == 2:
-            target.write_bytes(b"Modified\n")
-        return actual_fstat(descriptor)
+    def replace_read_source(descriptor: int) -> os.stat_result:
+        observed = actual_fstat(descriptor)
+        if ((observed.st_dev, observed.st_ino) == (before.st_dev, before.st_ino)
+                and os.lseek(descriptor, 0, os.SEEK_CUR) >= before.st_size
+                and target.stat().st_ino == before.st_ino):
+            replacement.replace(target)
+        return observed
 
-    monkeypatch.setattr(rename_lists.os, "fstat", change_after_read)
+    monkeypatch.setattr(rename_lists.os, "fstat", replace_read_source)
     loaded = load_dictionaries(state)
-    assert [(item.status, item.reason) for item in loaded.diagnostics if item.status != "observed"] == [("stale_plan", "dictionary_source_changed")]
-    assert loaded.release_groups == ()
-    assert target.read_bytes() == b"Modified\n"
+    assert any(item.status == "stale_plan" and item.reason == "dictionary_source_changed"
+               for item in loaded.diagnostics)
+    assert loaded.release_groups == () and target.read_bytes() == b"Modified\n"
 
 
 def test_failed_publication_retains_prior_dictionary_and_can_be_recovered(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

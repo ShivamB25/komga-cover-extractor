@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Literal
 
 import regex
@@ -262,7 +262,7 @@ def _clean_matched_number(value: str, kind: str, policy: NumberPolicy) -> str:
                 regex.escape(item) for item in _FILE_EXTENSIONS
             )
             name = regex.sub(
-                rf"(((\s+)?-(\s+)?([A-Za-z]+)?({extensions_expression}))",
+                rf"(((\s+)?-(\s+)?([A-Za-z]+))?({extensions_expression}))",
                 "",
                 name,
                 flags=regex.IGNORECASE,
@@ -306,21 +306,21 @@ _NUMBER_SEQUENCE = regex.compile(
 
 def _number_tokens(name: str, kind: str, policy: NumberPolicy) -> tuple[str, ...]:
     cleaned = _clean_matched_number(name, kind, policy)
-    match = _NUMBER_SEQUENCE.search(cleaned)
+    match = _NUMBER_SEQUENCE.fullmatch(cleaned)
     if match is None:
         return ()
     sequence = match.group("sequence")
     return tuple(sequence.split("-"))
 
 
-def _part_after_number(name: str, kind: str, policy: NumberPolicy) -> int | None:
+def _part_after_number(name: str, kind: str, policy: NumberPolicy) -> int | Decimal | None:
     prepared = _prepare_name(name)
     if kind == "volume":
         number_match = policy._compiled.volume_number.search(prepared)
         if number_match:
             prepared = prepared[number_match.end():]
         match = regex.search(
-            r"\bPart[-_. ]*([0-9]+(?:[._-][0-9]+)*)\b", prepared, flags=regex.IGNORECASE
+            r"\bPart[-_. ]?([0-9]+)\b", prepared, flags=regex.IGNORECASE
         )
         return int(match.group(1)) if match else None
 
@@ -333,13 +333,19 @@ def _part_after_number(name: str, kind: str, policy: NumberPolicy) -> int | None
         prepared[match_start:],
         flags=regex.IGNORECASE,
     )
-    return int(match.group(1)) if match and match.start() < len(match_text) else None
+    if match is None or match.start() >= len(match_text):
+        return None
+    try:
+        part = Decimal(match.group(1).replace("_", "."))
+    except InvalidOperation as error:
+        raise ValueError("invalid chapter part") from error
+    return int(part) if part == part.to_integral_value() else part
 
 
 def _kind_for_tokens(tokens: tuple[str, ...]) -> Literal["scalar", "range", "set"]:
     if len(tokens) == 1:
         return "scalar"
-    if len(tokens) == 2 and Decimal(tokens[0]) <= Decimal(tokens[1]):
+    if len(tokens) == 2:
         return "range"
     return "set"
 
@@ -357,7 +363,21 @@ def _chapter_match_text(name: str, policy: NumberPolicy) -> str | None:
     extensionless = prepared[: -len(_get_extension(prepared))] if _get_extension(prepared) else prepared
     if _has_multiple_numbers(prepared) and ("-" in prepared or "#" in prepared):
         trailing = patterns.chapter_number_at_end.search(extensionless)
-        if trailing:
+        collection = next(
+            (
+                match
+                for pattern in patterns.chapter_searches
+                if (match := pattern.search(prepared))
+            ),
+            None,
+        )
+        trailing_is_collection = (
+            trailing is not None
+            and collection is not None
+            and trailing.start() < collection.end()
+            and len(_number_tokens(collection.group(), "chapter", policy)) > 1
+        )
+        if trailing and not trailing_is_collection:
             prepared = patterns.chapter_number_at_end.sub("", extensionless)
             if prepared.endswith("-") and not regex.search(
                 r"-(\s+)?(#)?([0-9]+)(([-_.])([0-9]+)|)+(x[0-9]+)?(\s+)?-",
@@ -441,6 +461,8 @@ def parse_release_number(name: str, kind: str, policy: NumberPolicy) -> ReleaseN
         return ReleaseNumber.missing(part=_part_after_number(name, kind, policy))
 
     number_kind = _kind_for_tokens(tokens)
+    if number_kind == "range" and Decimal(tokens[0]) > Decimal(tokens[1]):
+        tokens = (tokens[1], tokens[0])
     if kind == "volume" and number_kind == "scalar" and Decimal(tokens[0]) >= _SINGLE_VOLUME_YEAR_CUTOFF:
         return ReleaseNumber.missing(part=_part_after_number(name, kind, policy))
 

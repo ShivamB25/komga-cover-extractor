@@ -31,6 +31,7 @@ from komga_cover_extractor.integrations.bookwalker import (
     search_bookwalker,
 )
 from komga_cover_extractor.integrations.http import HttpClient, HttpError
+from komga_cover_extractor.parsing.filenames import ParsingPolicy, parse_release
 from komga_cover_extractor.parsing.numbers import NumberPolicy
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "bookwalker"
@@ -206,6 +207,53 @@ def test_explicit_alias_queries_find_other_titles_without_duplicate_detail_reque
     ]
 
 
+@pytest.mark.parametrize("shortened_unique", [False, True])
+def test_library_subtitle_search_alerts_only_after_a_unique_shortened_query(
+    tmp_path: Path, shortened_unique: bool,
+) -> None:
+    source = tmp_path / "Series - Red" / "Series - Red v01.cbz"
+    source.parent.mkdir()
+    source.write_bytes(b"owned red volume")
+    query = "Series - Red"
+    responses = {
+        "search/?" + urlencode({"word": query, "np": 0}): (FIXTURES / "series.html").read_bytes(),
+        "search/?" + urlencode({"word": query, "page": 1, "qcat": 2}): search_page(
+            "Series - Red Volume 1", "Series - Blue Volume 2",
+        ),
+        "item-1/": detail_page("Series - Red"),
+        "item-2/": detail_page("Series - Blue"),
+        "search/?word=Series&np=0": (
+            b"<ul class='o-tile-list'><li class='o-tile'></li></ul>" if shortened_unique
+            else b"<ul class='o-tile-list'><li class='o-tile'></li><li class='o-tile'></li></ul>"
+        ),
+        "search/?word=Series&page=1&qcat=2": search_page("Series - Red Volume 3").replace(b"/item-1/", b"/item-3/"),
+        "item-3/": detail_page("Series - Red"),
+    }
+    client = Client(responses)
+    observed = parse_release(FileObservation(source, root_role="library"), ParsingPolicy())
+    result = check_bookwalker_releases(
+        (observed,), client=client.http, number_policy=NumberPolicy(), required_similarity_score=0.979,
+        authorization=RunAuthorization(allow_remote=True), clock=lambda: TODAY, request_interval_seconds=0,
+    )
+    assert result.exit_code == 0
+    assert result.missing_releases[0]["query"] == "Series - Red"
+    comparisons = result.missing_releases[0]["comparisons"]
+    assert [(item["book"]["title"], item["book"]["volume_number"], item["status"]) for item in comparisons] == [
+        ("Series - Red", "1", "existing"),
+        *([("Series - Red", "3", "missing")] if shortened_unique else []),
+    ]
+    notifications = bookwalker_notifications(result.missing_releases)
+    assert [(item["channel"], item["item"]["original_title"]) for item in notifications] == (
+        [("bookwalker_released", "Series - Red Volume 3")] if shortened_unique else []
+    )
+    searched_pages = [relative for _, relative, _ in client.calls if "&page=" in relative]
+    assert searched_pages == [
+        "search/?word=Series+-+Red&page=1&qcat=2",
+        *(["search/?word=Series&page=1&qcat=2"] if shortened_unique else []),
+    ]
+    assert source.read_bytes() == b"owned red volume"
+
+
 def test_grouping_preserves_every_book_deduplicates_by_url_and_sorts_numerically() -> None:
     first = remote(ReleaseNumber.scalar("1"), url="https://global.bookwalker.jp/1/")
     second = remote(ReleaseNumber.scalar("2"), url="https://global.bookwalker.jp/2/")
@@ -218,6 +266,15 @@ def test_grouping_preserves_every_book_deduplicates_by_url_and_sorts_numerically
     with pytest.raises(BookWalkerError) as caught:
         group_bookwalker_books([first, conflicting], required_similarity_score=0.979)
     assert (caught.value.status, caught.value.reason) == ("review_required", "bookwalker_conflicting_product_observations")
+
+
+def test_distinct_subtitles_are_not_grouped_by_their_shared_prefix() -> None:
+    red = remote(ReleaseNumber.scalar("1"), title="Series - Red", url="https://global.bookwalker.jp/red/")
+    blue = remote(ReleaseNumber.scalar("2"), title="Series - Blue", url="https://global.bookwalker.jp/blue/")
+    groups = group_bookwalker_books((red, blue), required_similarity_score=0.979)
+    assert [[(book["title"], book["number"].raw_tokens) for book in group] for group in groups] == [
+        [("Series - Red", ("1",))], [("Series - Blue", ("2",))],
+    ]
 
 
 def test_distinct_matching_remote_series_are_ambiguous_not_empty_success() -> None:

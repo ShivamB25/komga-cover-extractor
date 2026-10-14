@@ -56,6 +56,7 @@ class RunRequest:
     config_overrides: tuple[tuple[str, object], ...] = field(default=(), repr=False)
     config_path: Path | None = None
     watch: bool = False
+    ready_downloads: tuple[FileFingerprint, ...] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "books", tuple(Path(book) for book in self.books))
@@ -65,6 +66,8 @@ class RunRequest:
             raise TypeError("invocation authorization required")
         if type(self.watch) is not bool:
             raise TypeError("watch origin requires an explicit boolean")
+        if self.ready_downloads is not None:
+            object.__setattr__(self, "ready_downloads", tuple(self.ready_downloads))
 
 
 def _merge(left: RunResult, right: RunResult, *, releases: tuple[ReleaseSnapshot, ...] | None = None) -> RunResult:
@@ -198,6 +201,8 @@ class Pipeline:
             decisions.extend(classification_decisions)
         selected = tuple(release for release in snapshots if not requested or release.path in requested)
         result = RunResult(tuple(decisions), releases=selected)
+        if selected and request.watch and request.ready_downloads is None:
+            return replace(result, decisions=(*result.decisions, Decision("missing_dependency", "watch_readiness_required")))
         library_roots = tuple(root for root in roots if "library" in root.roles)
         catalog = LibrarySnapshot(
             snapshots, roots, bool(library_roots) and not any(root.path in unavailable for root in library_roots),
@@ -228,7 +233,7 @@ class Pipeline:
                 selected, catalog, roots=roots, parsing=self.parsing, cover_policy=self.covers,
                 series_policy=self.series_artwork, state_dir=self.state_dir, policy_version=self.policy_version,
                 authorization=request.authorization, cancel=self.cancel, interactive=request.interactive,
-                classification=self.classification,
+                classification=self.classification, matching=self.matching,
             )
             updated = {release.path: release for release in selected}
             updated.update((release.path, release) for release in outcome.releases)
@@ -237,7 +242,9 @@ class Pipeline:
         outcome = convert_releases(
             selected, roots=roots, archive_policy=self.archive, state_dir=self.state_dir,
             policy_version=self.policy_version, authorization=request.authorization,
-            cancel=self.cancel, interactive=request.interactive,
+            cancel=self.cancel, interactive=request.interactive, parsing=self.parsing,
+            manual_rename=self.options.get("manual_rename", False),
+            rename_zip_to_cbz=self.options.get("rename_zip_to_cbz", True),
         )
         visible = selected
         if request.authorization.apply and outcome.committed:
@@ -274,7 +281,7 @@ class Pipeline:
             return False
         relative = path.relative_to(root.path)
         return not (any(part.startswith(".") for part in relative.parts)
-                    or any(part in self.ignored_folder_names for part in relative.parent.parts)
+                    or any(part in self.ignored_folder_names for part in path.parent.parts)
                     or path.is_relative_to(self.state_dir)
                     or self.log_dir is not None and path.is_relative_to(self.log_dir))
 
@@ -410,6 +417,7 @@ class Pipeline:
             ),
             cover_policy=self.covers, series_policy=self.series_artwork, previous_plans=plans, scope_sources=scope,
             before=before,
+            ready_downloads=request.ready_downloads,
         )
 
     def _run_library(
@@ -422,7 +430,8 @@ class Pipeline:
         result = RunResult(releases=catalog.releases, planned_count=0)
         try:
             grouping_policy = replace(self.matching, match_through_image_similarity=False)
-            groups = organization_groups(selected, catalog, roots=roots, matching=grouping_policy)
+            groups = organization_groups(selected, catalog, roots=roots, matching=grouping_policy,
+                                         ready_downloads=request.ready_downloads)
             jobs: list[tuple[tuple[ReleaseSnapshot, ...], frozenset[Path]]] = []
             covered: set[Path] = set()
             root_paths = {root.path for root in roots}
@@ -469,6 +478,7 @@ class Pipeline:
                         unacceptable_keywords=self.unacceptable_keywords, ignored_folder_names=self.ignored_folder_names,
                         cover_policy=self.covers, series_policy=self.series_artwork,
                         files=files, directories=directories, scope_sources=scope,
+                        ready_downloads=request.ready_downloads,
                     )
                 failed_without_view = outcome.exit_code and not outcome.releases and not outcome.planned and not outcome.committed
                 if not request.authorization.apply and not failed_without_view:
@@ -588,7 +598,7 @@ class Pipeline:
             prepare_conversion,
             release_conversion_artifacts,
         )
-        from .convert import observe_header
+        from .convert import HeaderObservation, observe_header
         from .header_correction import correct_headers
         from .library_workflow import (
             ArtworkWorkspace,
@@ -597,7 +607,9 @@ class Pipeline:
             release_source,
             resolve_book_bytes,
         )
-        from .planning import project_release
+        from .organize import OPTIONS
+        from .planning import project_release, unready_download_inputs
+        organizer_active = any(self.options.get(name, False) for name in OPTIONS if name.endswith("_toggle"))
         original = catalog.releases
         decisions: list[Decision] = []
         previous: list[OperationPlan] = []
@@ -605,6 +617,14 @@ class Pipeline:
         operation_id = "run-" + uuid4().hex
         current = {release_source(release).path: release for release in catalog.releases}
         selected_sources = {release_source(release).path for release in selected}
+        if request.ready_downloads is not None:
+            ready = {source.path: source for source in request.ready_downloads}
+            if any(
+                files.get(source) != ready.get(source)
+                for source in selected_sources
+                if any("download" in root.roles and root.contains(source) for root in roots)
+            ):
+                return RunResult((Decision("delivery_deferred", "watch_scope_not_ready"),), releases=original)
         conversions: list[PreparedConversion] = []
         completed_parts: set[Path] = set()
         outcome: RunResult | None = None
@@ -616,12 +636,25 @@ class Pipeline:
                     root=workspace_root, operation_id=operation_id, authorization=request.authorization,
                     max_bytes=self.max_stage_bytes,
                 ))
-                if self.options.get("correct_file_extensions_toggle", False):
+                downloads = tuple(
+                    release for release in selected
+                    if any("download" in root.roles and root.contains(release_source(release).path) for root in roots)
+                )
+                correct_extensions = self.options.get("correct_file_extensions_toggle", False)
+                rename_zip = self.options.get("convert_to_cbz_toggle", False) and self.options.get("rename_zip_to_cbz", True)
+                headers: dict[Path, HeaderObservation] = {}
+                header_inputs = downloads if correct_extensions else ()
+                if not correct_extensions and rename_zip:
+                    header_inputs = tuple(
+                        release for release in downloads if release_source(release).path.suffix.lower() == ".zip"
+                    )
+                if header_inputs:
                     corrected = correct_headers(
-                        selected, roots=roots, parsing=self.parsing, archive_policy=self.archive, state_dir=self.state_dir,
+                        header_inputs, roots=roots, parsing=self.parsing, archive_policy=self.archive, state_dir=self.state_dir,
                         policy_version=self.policy_version, authorization=RunAuthorization(), cancel=self.cancel,
                         manual_rename=self.options.get("manual_rename", False), interactive=request.interactive,
-                        rename_zip_to_cbz=self.options.get("rename_zip_to_cbz", True),
+                        rename_zip_to_cbz=self.options.get("rename_zip_to_cbz", True), zip_only=not correct_extensions,
+                        observations=headers,
                     )
                     decisions.extend(corrected.decisions)
                     if corrected.exit_code:
@@ -633,9 +666,13 @@ class Pipeline:
                     for source in sorted(selected_sources):
                         if source in completed_parts:
                             continue
+                        if not any("download" in root.roles and root.contains(source) for root in roots):
+                            continue
                         release = current[source]
                         observed = release_source(release)
-                        header = observe_header(observed.path, root=observed.root, policy=self.archive, cancel=self.cancel)
+                        header = headers.get(observed.path)
+                        if header is None:
+                            header = observe_header(observed.path, root=observed.root, policy=self.archive, cancel=self.cancel)
                         if header.source != observed:
                             raise WorkerError("conversion_source_changed", "stale_plan")
                         if header.container not in {"rar", "7z"}:
@@ -703,6 +740,10 @@ class Pipeline:
                             or not cross_series_metadata and release.path.parent not in candidate_folders
                             or "archive:observed" in release.provenance):
                         continue
+                    if (request.ready_downloads is not None
+                            and any("download" in root.roles and root.contains(source) for root in roots)
+                            and files.get(source) != ready.get(source)):
+                        continue
                     try:
                         current[source] = self._inspect_release(release, resolve_book_bytes(release, previous))
                         observed_before[source] = parse_release(replace(current[source].observation, path=source), self.parsing)
@@ -736,7 +777,7 @@ class Pipeline:
                         art = plan_projected_artwork(
                             art_selected, replace(group_catalog, releases=tuple(current.values())), roots=roots,
                             parsing=self.parsing, cover_policy=self.covers, series_policy=self.series_artwork,
-                            classification=self.classification, files=files, directories=directories,
+                            classification=self.classification, matching=self.matching, files=files, directories=directories,
                             previous_plans=previous, state_dir=self.state_dir, policy_version=self.policy_version,
                             workspace=workspace, cancel=self.cancel,
                             convert_native=self.options.get("convert_to_cbz_toggle", False),
@@ -763,7 +804,7 @@ class Pipeline:
                         art = plan_projected_artwork(
                             art_selected, replace(group_catalog, releases=tuple(current.values())), roots=roots,
                             parsing=self.parsing, cover_policy=self.covers, series_policy=self.series_artwork,
-                            classification=self.classification, files=files, directories=directories,
+                            classification=self.classification, matching=self.matching, files=files, directories=directories,
                             previous_plans=previous, state_dir=self.state_dir, policy_version=self.policy_version,
                             workspace=workspace, cancel=self.cancel,
                             convert_native=self.options.get("convert_to_cbz_toggle", False),
@@ -774,20 +815,32 @@ class Pipeline:
                             return _merge(RunResult(tuple(decisions), releases=original), dictionary_result, releases=original)
                         previous.extend(art.plans)
                         current = {release_source(release).path: release for release in art.releases}
-                        chosen = tuple(current[source] for source in sorted(selected_sources) if source in current)
-                        matched = self._prepare_group(chosen, replace(group_catalog, releases=tuple(current.values())), roots=roots,
-                                                      files=files, directories=directories, plans=previous,
-                                                      scope=scope, request=request, stage="after_matching", before=original)
-                        decisions.extend(matched.decisions)
-                        if matched.exit_code:
-                            return _merge(RunResult(tuple(decisions), releases=original), dictionary_result, releases=original)
-                        previous = workspace.spill_plans(matched.plans)
-                        current = {release_source(release).path: release for release in matched.releases}
+                        if organizer_active:
+                            chosen = tuple(current[source] for source in sorted(selected_sources) if source in current)
+                            matched = self._prepare_group(chosen, replace(group_catalog, releases=tuple(current.values())), roots=roots,
+                                                          files=files, directories=directories, plans=previous,
+                                                          scope=scope, request=request, stage="after_matching", before=original)
+                            decisions.extend(matched.decisions)
+                            if matched.exit_code:
+                                return _merge(RunResult(tuple(decisions), releases=original), dictionary_result, releases=original)
+                            previous = workspace.spill_plans(matched.plans)
+                            current = {release_source(release).path: release for release in matched.releases}
+                        else:
+                            previous = workspace.spill_plans(previous)
                 if not previous:
                     return _merge(RunResult(tuple(decisions), skipped=matched.skipped,
                                             releases=tuple(current.values()), planned_count=0), dictionary_result,
                                   releases=tuple(current.values()))
                 final = _join_plans(previous, operation_id=operation_id, policy_version=self.policy_version)
+                waiting = unready_download_inputs(
+                    final.operations, files=files, roots=roots, ready_downloads=request.ready_downloads,
+                )
+                if waiting:
+                    return _merge(RunResult(
+                        (*decisions, Decision("delivery_deferred", "watch_scope_not_ready", waiting[0].path,
+                                             tuple(str(source.path) for source in waiting))),
+                        releases=original, planned_count=0,
+                    ), dictionary_result, releases=original)
                 workspace.record(final)
                 if request.authorization.apply:
                     for prepared in conversions:

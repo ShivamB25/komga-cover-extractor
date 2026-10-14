@@ -10,6 +10,7 @@ import tempfile
 from collections.abc import Buffer, Callable
 from contextlib import ExitStack
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING, BinaryIO, cast
@@ -21,11 +22,16 @@ from .zip_archive import (
     ArchiveMember,
     ArchivePolicy,
     validate_member_name,
+    zip_member_timestamp,
 )
 
 if TYPE_CHECKING:
     from py7zr import SevenZipFile
     from py7zr.io import Py7zIO, WriterFactory
+
+_FILETIME_TICKS_PER_SECOND = 10_000_000
+_FILETIME_UNIX_EPOCH_SECONDS = 11_644_473_600
+_MAX_DATETIME_UNIX_SECONDS = 253_402_300_799
 
 
 @dataclass(slots=True)
@@ -316,7 +322,15 @@ class SevenZipReader:
                 packed = item.compressed
                 if not isinstance(size, int) or (packed is not None and not isinstance(packed, int)):
                     raise ArchiveError('invalid_archive_size')
-                members.append(ArchiveMember(name, size, packed or 0, is_dir, raw_name))
+                modified_at = None
+                last_write = item.lastwritetime
+                if last_write is not None:
+                    if not isinstance(last_write, int) or isinstance(last_write, bool) or not 0 <= last_write < 1 << 64:
+                        raise ArchiveError('invalid_archive_timestamp')
+                    seconds = last_write // _FILETIME_TICKS_PER_SECOND - _FILETIME_UNIX_EPOCH_SECONDS
+                    timestamp = datetime(2107, 12, 31, 23, 59, 58) if seconds > _MAX_DATETIME_UNIX_SECONDS else datetime.fromtimestamp(seconds, UTC)
+                    modified_at = zip_member_timestamp(timestamp)
+                members.append(ArchiveMember(name, size, packed or 0, is_dir, raw_name, modified_at))
             self._members = tuple(members)
             check_members(self._members, self.policy, packed_size=self.sources[0].size)
             self._by_name = {member.name: member for member in self._members}

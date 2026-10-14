@@ -4,6 +4,8 @@ from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 
+import pytest
+
 from komga_cover_extractor.covers.series_policy import (
     ArtworkImageObservation,
     BookArtworkObservation,
@@ -157,11 +159,30 @@ def test_two_archives_sharing_stem_conflict_before_sidecar_plan() -> None:
     assert (result.status, result.reason, set(result.candidates), result.associations) == ("conflict", "shared_book_sidecar_stem", {comic.path, epub.path}, ())
 
 
-def test_one_shot_does_not_arbitrarily_supply_volume_one_art() -> None:
-    first = _release("Series v01.cbz", ReleaseNumber.scalar("1"))
-    art = replace(_art(first, "one shot"), is_one_shot=True)
-    result = plan_series_artwork((first,), policy=SeriesCoverPolicy(observation=SeriesArtworkObservation(ROOT, (art,))))
-    assert (result.status, result.reason) == ("no_match", "volume_one_required")
+def test_unique_one_shot_supplies_exact_series_art_in_both_modes() -> None:
+    book = _release("Series.epub", ReleaseNumber.scalar("1"))
+    art = replace(_art(book, "one shot"), is_one_shot=True)
+    observation = SeriesArtworkObservation(ROOT, (art,))
+    for mode in ("first", "latest"):
+        result = plan_series_artwork((book,), policy=SeriesCoverPolicy(mode=mode, observation=observation))
+        assert result.status == "copy"
+        assert result.selected_release is not None
+        assert result.selected_release.path == ROOT / "Series.epub"
+        assert [(item.source_book, item.source_image.path, item.destination) for item in result.associations] == [
+            (ROOT / "Series.epub", ROOT / "Series.jpg", ROOT / "cover.jpg"),
+        ]
+
+
+def test_two_distinct_one_shots_require_review_in_both_modes() -> None:
+    first = _release("Series [A].epub", ReleaseNumber.scalar("1"))
+    other = _release("Series [B].epub", ReleaseNumber.scalar("1"))
+    observation = SeriesArtworkObservation(ROOT, tuple(
+        replace(_art(book, book.name), is_one_shot=True) for book in (first, other)
+    ))
+    for mode in ("first", "latest"):
+        result = plan_series_artwork((first, other), policy=SeriesCoverPolicy(mode=mode, observation=observation))
+        assert (result.status, result.reason, result.associations) == ("ambiguous", "multiple_qualifying_releases", ())
+        assert result.candidates == (ROOT / "Series [A].epub", ROOT / "Series [B].epub")
 
 
 def test_chapter_copy_requires_unique_explicit_volume_match_and_volume_one() -> None:
@@ -170,7 +191,8 @@ def test_chapter_copy_requires_unique_explicit_volume_match_and_volume_one() -> 
     volume = _release("Series v01.cbz", ReleaseNumber.scalar("1"))
     matched = VolumeSeriesArtworkObservation(ROOT, (volume,), (_art(volume, "volume cover"),), "mapped")
     observation = SeriesArtworkObservation(chapter_root, matched_volume_series=(matched,))
-    policy = SeriesCoverPolicy(mode="latest", copy_existing_volume_covers_toggle=True, observation=observation)
+    policy = SeriesCoverPolicy(mode="latest", copy_existing_volume_covers_toggle=True,
+                               chapter_support_toggle=True, extract_chapter_covers=True, observation=observation)
     result = plan_series_artwork((chapter,), policy=policy)
     assert (result.status, result.selected_release.path, result.associations[0].destination) == ("copy", volume.path, chapter_root / "cover.jpg")
     unmatched = plan_series_artwork((chapter,), policy=replace(policy, observation=replace(observation, matched_volume_series=())))
@@ -181,6 +203,27 @@ def test_chapter_copy_requires_unique_explicit_volume_match_and_volume_one() -> 
     no_one = replace(matched, releases=(second,), book_artwork=(_art(second, "second cover"),))
     refused = plan_series_artwork((chapter,), policy=replace(policy, observation=replace(observation, matched_volume_series=(no_one,))))
     assert (refused.status, refused.reason) == ("no_match", "volume_one_required")
+
+
+@pytest.mark.parametrize(("support", "extract"), [(False, False), (True, False), (False, True)])
+@pytest.mark.parametrize("copy", [False, True])
+def test_chapter_artwork_gates_precede_local_or_matched_volume_selection(
+    support: bool, extract: bool, copy: bool,
+) -> None:
+    chapter_root = Path("/owned/chapters/Series")
+    chapter = _release("Series c001.cbz", ReleaseNumber.scalar("1"), directory=chapter_root, kind="chapter")
+    volume = _release("Series v01.cbz", ReleaseNumber.scalar("1"))
+    matched = VolumeSeriesArtworkObservation(ROOT, (volume,), (_art(volume, "volume cover"),), "matched")
+    observation = SeriesArtworkObservation(
+        chapter_root, (_art(chapter, "chapter cover"),), matched_volume_series=(matched,),
+    )
+    result = plan_series_artwork((chapter,), policy=SeriesCoverPolicy(
+        copy_existing_volume_covers_toggle=copy, chapter_support_toggle=support,
+        extract_chapter_covers=extract, observation=observation,
+    ))
+    assert (result.status, result.reason, result.selected_release, result.associations) == (
+        "no_match", "chapter_cover_disabled", None, (),
+    )
 
 
 def test_local_chapter_art_uses_chapter_one_not_latest_or_known_zero() -> None:

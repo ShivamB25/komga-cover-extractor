@@ -35,6 +35,14 @@ def _raster(color: str, *, image_format: str = "PNG") -> bytes:
     return buffer.getvalue()
 
 
+def _textured_raster(color: str) -> bytes:
+    buffer = BytesIO()
+    with Image.new("RGB", (16, 16), color) as image:
+        image.paste((0, 0, 0), (0, 0, 8, 8))
+        image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 def _archive(path: Path, entries: tuple[tuple[str, bytes], ...]) -> Path:
     with zipfile.ZipFile(path, "w") as archive:
         for name, data in entries:
@@ -105,18 +113,20 @@ def test_epub_worker_resolves_exact_percent_decoded_member(tmp_path: Path) -> No
 
 
 @pytest.mark.parametrize("href", ["https://invalid.example/cover.jpg", "../../outside.jpg", "missing.jpg"])
-def test_authoritative_bad_epub_target_does_not_use_blue_decoy(tmp_path: Path, href: str) -> None:
+@pytest.mark.parametrize("blank_filter", [False, True])
+def test_authoritative_bad_epub_target_does_not_use_blue_decoy(tmp_path: Path, href: str, blank_filter: bool) -> None:
     book = _epub(tmp_path / "Novel.epub", cover_href=href)
     before = _manifest(tmp_path)
-    result = extract_cover(book, root=tmp_path, policy=CoverPolicy(ArchivePolicy()), output=FileOutputPolicy())
+    result = extract_cover(book, root=tmp_path, policy=CoverPolicy(ArchivePolicy(), compare_detected_cover_to_blank_images=blank_filter), output=FileOutputPolicy())
     assert result.status == "invalid_input"
     assert result.artifact is None and result.data is None
     assert _manifest(tmp_path) == before
 
 
-def test_authoritative_multiple_epub_covers_require_review(tmp_path: Path) -> None:
+@pytest.mark.parametrize("blank_filter", [False, True])
+def test_authoritative_multiple_epub_covers_require_review(tmp_path: Path, blank_filter: bool) -> None:
     book = _epub(tmp_path / "Novel.epub", extra_manifest='<item id="other" href="../AAA/Front%20Cover.jpg" media-type="image/jpeg" properties="cover-image"/>')
-    result = extract_cover(book, root=tmp_path, policy=CoverPolicy(ArchivePolicy()), output=FileOutputPolicy())
+    result = extract_cover(book, root=tmp_path, policy=CoverPolicy(ArchivePolicy(), compare_detected_cover_to_blank_images=blank_filter), output=FileOutputPolicy())
     assert result.status in {"review_required", "ambiguous"}
     assert result.artifact is None
 
@@ -141,7 +151,7 @@ def test_all_member_pages_include_truthful_directory_observations(tmp_path: Path
     book = _archive(tmp_path / "Series.cbz", (("000.png/", b""), ("001.xml", b"<generated/>"), ("nested/01.png", _raster("red"))))
     result = extract_cover(book, root=tmp_path, policy=CoverPolicy(ArchivePolicy()), output=FileOutputPolicy())
     assert result.status == "valid"
-    assert tuple((page.name, page.is_directory) for page in result.archive_pages) == (("000.png", True), ("001.xml", False), ("nested/01.png", False))
+    assert tuple((page.name, page.is_directory) for page in result.archive_pages) == (("000.png/", True), ("001.xml", False), ("nested/01.png", False))
 
 
 def test_encoded_output_quota_preserves_original_book_and_custom_cover(tmp_path: Path) -> None:
@@ -315,3 +325,116 @@ def test_comparison_source_change_is_stale_without_decoding_or_cleanup(tmp_path:
         run_worker("cover", request)
     assert (caught.value.status, caught.value.reason) == ("stale_plan", "comparison_source_changed")
     assert left.read_bytes() == changed and right.read_bytes() == _raster("blue")
+
+
+@pytest.mark.parametrize(("raw_first", "canonical_first", "other"), [
+    ("./z.png", "z.png", "a.png"),
+    ("dir//01.png", "dir/01.png", "dir/00.png"),
+])
+def test_real_cover_worker_sorts_raw_members_without_changing_safe_lookup(
+    tmp_path: Path, raw_first: str, canonical_first: str, other: str,
+) -> None:
+    red = _raster("red")
+    book = _archive(tmp_path / "Series.cbz", ((other, _raster("blue")), (raw_first, red)))
+    original = book.read_bytes()
+    result = extract_cover(book, root=tmp_path, policy=CoverPolicy(ArchivePolicy()), output=FileOutputPolicy())
+    assert (result.status, result.selected_member, result.format) == ("valid", canonical_first, "PNG")
+    assert result.artifact is not None and result.artifact.content == red
+    assert tuple(page.name for page in result.archive_pages) == (raw_first, other)
+    assert book.read_bytes() == original
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["Series.cbz"]
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0"])
+@pytest.mark.parametrize("blank_authority", [False, True])
+def test_authoritative_epub_blank_uses_ordered_nonblank_fallback_only_after_blank_proof(
+    tmp_path: Path, version: str, blank_authority: bool,
+) -> None:
+    container = b'<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>'
+    metadata = '<meta name="cover" content="front"/>' if version == "2.0" else ""
+    properties = ' properties="cover-image"' if version == "3.0" else ""
+    package = f'<package xmlns="http://www.idpf.org/2007/opf" version="{version}"><metadata>{metadata}</metadata><manifest><item id="front" href="front.png" media-type="image/png"{properties}/></manifest></package>'.encode()
+    authority = _raster("white") if blank_authority else _textured_raster("green")
+    fallback = _textured_raster("red")
+    book = _archive(tmp_path / "Novel.epub", (
+        ("mimetype", b"application/epub+zip"), ("META-INF/container.xml", container),
+        ("OPS/package.opf", package), ("OPS/front.png", authority),
+        ("OPS/cover_00.png", _raster("white")), ("OPS/cover_01.png", _textured_raster("blue")),
+        ("OPS/p000.png", fallback), ("OPS/01.png", _textured_raster("blue")),
+    ))
+    before = _manifest(tmp_path)
+    result = extract_cover(
+        book, root=tmp_path,
+        policy=CoverPolicy(ArchivePolicy(), compare_detected_cover_to_blank_images=True,
+                           cover_patterns=(r"cover", r"p000")),
+        output=FileOutputPolicy(),
+    )
+    assert result.status == "valid"
+    assert result.selected_member == ("OPS/p000.png" if blank_authority else "OPS/front.png")
+    assert result.reason == ("ordered_epub_fallback" if blank_authority else "authoritative_epub_cover")
+    assert result.artifact is not None and result.artifact.content == (fallback if blank_authority else authority)
+    assert ("epub_image_fallback" in result.diagnostics) is blank_authority
+    assert _manifest(tmp_path) == before
+
+
+def test_invalid_authoritative_epub_raster_never_uses_nonblank_fallback(tmp_path: Path) -> None:
+    container = b'<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>'
+    package = b'<package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata/><manifest><item id="front" href="front.png" media-type="image/png" properties="cover-image"/></manifest></package>'
+    book = _archive(tmp_path / "Novel.epub", (
+        ("mimetype", b"application/epub+zip"), ("META-INF/container.xml", container),
+        ("OPS/package.opf", package), ("OPS/front.png", b"not a raster"),
+        ("OPS/p000.png", _textured_raster("red")),
+    ))
+    before = _manifest(tmp_path)
+    result = extract_cover(
+        book, root=tmp_path,
+        policy=CoverPolicy(ArchivePolicy(), compare_detected_cover_to_blank_images=True),
+        output=FileOutputPolicy(),
+    )
+    assert (result.status, result.reason, result.artifact) == ("invalid_input", "invalid_image", None)
+    assert _manifest(tmp_path) == before
+
+
+def test_hidden_raw_first_image_contributes_grayscale_without_becoming_cover(tmp_path: Path) -> None:
+    book = _archive(tmp_path / "Series.cbz", ((".000.png", _raster("gray")), ("001.png", _raster("red"))))
+    result = extract_cover(book, root=tmp_path, policy=CoverPolicy(ArchivePolicy()), output=FileOutputPolicy())
+    assert (result.status, result.selected_member) == ("valid", "001.png")
+    assert result.artifact is not None and result.artifact.content == _raster("red")
+    assert tuple((page.name, page.is_grayscale) for page in result.archive_pages) == ((".000.png", True), ("001.png", False))
+
+
+@pytest.mark.parametrize("suffix", [".png", ".PNG"])
+@pytest.mark.parametrize("blank_filter", [False, True])
+@pytest.mark.parametrize("unused", [b"not a raster", b"x" * 4097], ids=["invalid-image", "over-read-budget"])
+def test_epub_authority_ignores_unselected_hidden_raw_first_raster(
+    tmp_path: Path, suffix: str, blank_filter: bool, unused: bytes,
+) -> None:
+    container = b'<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>'
+    member = "OPS/front" + suffix
+    package = f'<package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata/><manifest><item id="front" href="front{suffix}" media-type="image/png" properties="cover-image"/></manifest></package>'.encode()
+    authority = _textured_raster("red")
+    book = _archive(tmp_path / "Novel.epub", (
+        (".000.png", unused), ("mimetype", b"application/epub+zip"),
+        ("META-INF/container.xml", container), ("OPS/package.opf", package),
+        (member, authority),
+    ))
+    before = _manifest(tmp_path)
+    source = fingerprint(book, tmp_path)
+    result = extract_cover(
+        book, root=tmp_path,
+        policy=CoverPolicy(ArchivePolicy(cover_read_max_bytes=4096),
+                           compare_detected_cover_to_blank_images=blank_filter),
+        output=FileOutputPolicy(),
+    )
+    assert (result.status, result.reason, result.container, result.selected_member) == (
+        "valid", "authoritative_epub_cover", "epub", member,
+    )
+    assert result.artifact is not None and result.artifact.content == authority
+    with Image.open(BytesIO(result.artifact.content)) as image:
+        assert image.format == "PNG" and image.getpixel((12, 12)) == (255, 0, 0)
+    assert tuple((page.name, page.is_grayscale) for page in result.archive_pages) == (
+        (".000.png", None), ("META-INF/container.xml", None), (member, False),
+        ("OPS/package.opf", None), ("mimetype", None),
+    )
+    assert fingerprint(book, tmp_path) == source
+    assert _manifest(tmp_path) == before

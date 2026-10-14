@@ -5,6 +5,7 @@ import os
 import zipfile
 from pathlib import Path
 from threading import Event
+from typing import Literal
 
 import pytest
 
@@ -21,6 +22,7 @@ from komga_cover_extractor.domain.decisions import RunAuthorization, RunResult
 from komga_cover_extractor.domain.libraries import LibraryRoot, LibrarySnapshot
 from komga_cover_extractor.domain.operations import (
     ArtifactSpec,
+    FileFingerprint,
     Operation,
     OperationPlan,
     RootPermission,
@@ -84,6 +86,7 @@ def _catalog(roots: tuple[LibraryRoot, ...], *releases: ReleaseSnapshot) -> Libr
 def _run(
     roots: tuple[LibraryRoot, ...], selected: tuple[ReleaseSnapshot, ...], *, apply: bool = False,
     command: str = "organize", options: dict[str, bool] | None = None, interactive: bool = False,
+    ready_downloads: tuple[FileFingerprint, ...] | None = None,
     **overrides: object,
 ) -> RunResult:
     pytest.importorskip("PIL", reason="pipeline organizer observations require covers")
@@ -108,7 +111,8 @@ def _run(
     values.update(overrides)
     config = validate_config(values, base_dir=base)
     request = RunRequest(command, books=tuple(release.path for release in selected), roots=roots,
-                         authorization=RunAuthorization(apply=apply), interactive=interactive)
+                         authorization=RunAuthorization(apply=apply), interactive=interactive,
+                         ready_downloads=ready_downloads)
     with open_pipeline(config, request=request) as pipeline:
         return pipeline.run(request)
 
@@ -301,7 +305,7 @@ def test_manual_duplicate_skip_finishes_without_repeating_the_prompt(roots, monk
 
 def test_matching_strict_upgrade_keeps_every_original_until_the_group_commits(roots) -> None:
     old = _book(roots[1], "Series/Series v01 (Scan).cbz", b"old scan")
-    incoming = _book(roots[0], "Series Volume 1 (Digital).cbz", b"new digital")
+    incoming = _book(roots[0], "Incoming/Series Volume 1 (Digital).cbz", b"new digital")
     old_bytes, new_bytes = old.path.read_bytes(), incoming.path.read_bytes()
     old_sidecar, incoming_sidecar = old.path.with_suffix(".png"), incoming.path.with_suffix(".png")
     old_sidecar.write_bytes(b"old associated artwork")
@@ -321,7 +325,7 @@ def test_matching_strict_upgrade_keeps_every_original_until_the_group_commits(ro
 
 def test_complete_range_upgrade_retires_all_components_after_publication(roots) -> None:
     components = tuple(_book(roots[1], f"Series/Series v0{number} (Scan).cbz", str(number).encode()) for number in (1, 2, 3))
-    collection = _book(roots[0], "Series v01-03 (Digital).cbz", b"complete collection")
+    collection = _book(roots[0], "Incoming/Series v01-03 (Digital).cbz", b"complete collection")
     originals = {release.path: release.path.read_bytes() for release in components}
     collection_bytes = collection.path.read_bytes()
     result = _run(roots, (collection,), apply=True,
@@ -338,7 +342,7 @@ def test_complete_range_upgrade_retires_all_components_after_publication(roots) 
 
 def test_explicit_collection_members_do_not_retire_holes(roots) -> None:
     components = tuple(_book(roots[1], f"Series/Series v0{number} (Scan).cbz", str(number).encode()) for number in (1, 2, 3, 4, 5))
-    collection = _book(roots[0], "Series v01-03-05 (Digital).cbz", b"explicit members")
+    collection = _book(roots[0], "Incoming/Series v01-03-05 (Digital).cbz", b"explicit members")
     result = _run(roots, (collection,), apply=True,
                   options=_options(check_for_existing_series_toggle=True))
     assert result.exit_code == 0 and result.committed == 1
@@ -355,7 +359,7 @@ def test_explicit_collection_members_do_not_retire_holes(roots) -> None:
 def test_partial_or_inconsistently_ranked_collections_preserve_every_candidate(roots, incoming_name, component_names) -> None:
     for name in component_names:
         _book(roots[1], "Series/" + name, name.encode())
-    incoming = _book(roots[0], incoming_name, b"incoming")
+    incoming = _book(roots[0], "Incoming/" + incoming_name, b"incoming")
     before = _tree(roots[0].path.parent)
     result = _run(roots, (incoming,), apply=True,
                   options=_options(check_for_existing_series_toggle=True))
@@ -366,7 +370,7 @@ def test_partial_or_inconsistently_ranked_collections_preserve_every_candidate(r
 
 def test_failure_before_staging_does_not_retire_collection_components(roots, monkeypatch) -> None:
     components = tuple(_book(roots[1], f"Series/Series v0{number} (Scan).cbz", str(number).encode()) for number in (1, 2, 3))
-    collection = _book(roots[0], "Series v01-03 (Digital).cbz", b"new")
+    collection = _book(roots[0], "Incoming/Series v01-03 (Digital).cbz", b"new")
     originals = {release.path: release.path.read_bytes() for release in (*components, collection)}
     class FailingExecutor(TransactionExecutor):
         def __init__(self, *args, **kwargs):
@@ -386,7 +390,7 @@ def test_failure_before_staging_does_not_retire_collection_components(roots, mon
 def test_two_name_matches_in_the_same_tier_do_not_choose_a_directory(roots) -> None:
     one = _book(roots[1], "First/Series/Series v01.cbz", b"one")
     two = _book(roots[1], "Second/Series/Series v01.cbz", b"two")
-    incoming = _book(roots[0], "Series v02.cbz", b"new")
+    incoming = _book(roots[0], "Incoming/Series v02.cbz", b"new")
     before = _tree(roots[0].path.parent)
     result = _run(roots, (incoming,), apply=True,
                   options=_options(check_for_existing_series_toggle=True))
@@ -397,7 +401,7 @@ def test_two_name_matches_in_the_same_tier_do_not_choose_a_directory(roots) -> N
 
 
 def test_unavailable_catalog_does_not_authorize_a_match_or_retirement(roots) -> None:
-    incoming = _book(roots[0], "Series v01 (Digital).cbz", b"incoming")
+    incoming = _book(roots[0], "Incoming/Series v01 (Digital).cbz", b"incoming")
     existing = _book(roots[1], "Series/Series v01 (Scan).cbz", b"old scan")
     with zipfile.ZipFile(existing.path, "w") as archive:
         archive.writestr("ComicInfo.xml", b"<ComicInfo><Publisher>malformed")
@@ -524,7 +528,7 @@ def test_changed_library_match_evidence_is_stale_before_organizer_publication(
     ambiguous = match_case.startswith("ambiguous")
     folders = ("First/Series", "Second/Series") if ambiguous else ("Series",)
     existing = tuple(_book(roots[1], f"{folder}/Series v01 (Scan).cbz", folder.encode()) for folder in folders)
-    incoming = _book(roots[0], f"Series v0{2 if match_case == 'new-release' else 1} (Digital).cbz", b"incoming")
+    incoming = _book(roots[0], f"Incoming/Series v0{2 if match_case == 'new-release' else 1} (Digital).cbz", b"incoming")
     for release in (*existing, incoming):
         release.path.with_suffix(".png").write_bytes(b"associated artwork for " + release.name.encode())
     catalog = _catalog(roots, *existing)
@@ -584,7 +588,7 @@ def test_prepared_upgrade_revalidates_both_books_before_move_or_retirement(
     roots: tuple[LibraryRoot, ...], changed_source: str,
 ) -> None:
     existing = _book(roots[1], "Series/Series v01 (Scan).cbz", b"old scan")
-    incoming = _book(roots[0], "Series v01 (Digital).cbz", b"new digital")
+    incoming = _book(roots[0], "Incoming/Series v01 (Digital).cbz", b"new digital")
     for release in (existing, incoming):
         release.path.with_suffix(".png").write_bytes(b"associated artwork for " + release.name.encode())
     originals = {release.path: release.path.read_bytes() for release in (existing, incoming)}
@@ -680,7 +684,7 @@ def test_header_conversion_and_organization_compose_without_publishing_the_heade
 
 def test_custom_series_art_blocks_upgrade_instead_of_guessing_ownership(roots) -> None:
     old = _book(roots[1], "Series/Series v01 (Scan).cbz", b"old")
-    incoming = _book(roots[0], "Series v01 (Digital).cbz", b"new")
+    incoming = _book(roots[0], "Incoming/Series v01 (Digital).cbz", b"new")
     poster = old.parent / "poster.png"
     poster.write_bytes(_png("green"))
     incoming.path.with_suffix(".png").write_bytes(_png("blue"))
@@ -694,7 +698,7 @@ def test_custom_series_art_blocks_upgrade_instead_of_guessing_ownership(roots) -
 
 def test_owned_series_art_replacement_is_in_the_book_publication_group(roots) -> None:
     old = _book(roots[1], "Series/Series v01 (Scan).cbz", b"old")
-    incoming = _book(roots[0], "Series v01 (Digital).cbz", b"new")
+    incoming = _book(roots[0], "Incoming/Series v01 (Digital).cbz", b"new")
     old_image, new_image = _png("red"), _png("blue")
     cover = old.parent / "cover.png"
     incoming.path.with_suffix(".png").write_bytes(new_image)
@@ -727,7 +731,7 @@ def test_type_routing_requires_all_extensions_and_one_destination(roots, tmp_pat
     match_roots = (roots[0], roots[1],
                    LibraryRoot(correct, library_types=("Digital",), formats=("volume",), extensions=(".cbz",)))
     old = _book(match_roots[1], "Series/Series v01 (Scan).cbz", b"old")
-    incoming = _book(match_roots[0], "Series v01 (Digital).cbz", b"new")
+    incoming = _book(match_roots[0], "Incoming/Series v01 (Digital).cbz", b"new")
     types = [
         {"name": "Digital", "extensions": [".cbz"], "must_contain": [r"Digital"],
          "must_not_contain": [], "match_percentage": 90},
@@ -756,7 +760,7 @@ def test_flat_download_root_produces_independent_book_groups_not_one_root_group(
 
 def test_previously_generated_sidecar_follows_the_final_matched_book_path(roots) -> None:
     existing = _book(roots[1], "Series/Series v01.cbz", b"existing")
-    incoming = _book(roots[0], "Series v02.cbz", b"new")
+    incoming = _book(roots[0], "Incoming/Series v02.cbz", b"new")
     picture = _png("blue")
     with zipfile.ZipFile(incoming.path, "a") as archive:
         archive.writestr("01.png", picture)
@@ -829,3 +833,596 @@ def test_filter_stage_leaves_renaming_for_the_dictionary_insertion_point(roots) 
         ("quarantine", bad.path), ("move", roots[0].path / "Series v01.cbz"),
     }
     assert retained.path.exists() and not (roots[0].path / "Series v01.cbz").exists()
+
+
+@pytest.mark.parametrize("consumer", ["rename", "group", "duplicates", "matching"])
+@pytest.mark.parametrize("chapter_support", [False, True], ids=["disabled", "enabled"])
+def test_ordinary_chapter_consumers_respect_support(
+    roots: tuple[LibraryRoot, ...], consumer: str, chapter_support: bool,
+) -> None:
+    if consumer == "rename":
+        chapter = _book(roots[0], "Incoming/Series Chapter 1.cbz", b"chapter input")
+        target = roots[0].path / "Incoming/Series c001.cbz"
+        settings = _options(rename_files_in_download_folders_toggle=True)
+        selected = (chapter,)
+    elif consumer == "group":
+        chapter = _book(roots[0], "Series c001.cbz", b"chapter input")
+        target = roots[0].path / "Series/Series c001.cbz"
+        settings = _options(create_folders_for_items_in_download_folder_toggle=True)
+        selected = (chapter,)
+    elif consumer == "duplicates":
+        chapter = _book(roots[0], "Incoming/Series c001.cbz", b"chapter input")
+        preferred = _book(roots[0], "Incoming/Series c001 (Digital).cbz", b"preferred chapter")
+        target = preferred.path
+        settings = _options(check_for_duplicate_volumes_toggle=True)
+        selected = (chapter, preferred)
+    else:
+        chapter = _book(roots[0], "Incoming/Series c002.cbz", b"chapter input")
+        _book(roots[1], "Series/Series c001.cbz", b"existing chapter")
+        target = roots[1].path / "Series/Series c002.cbz"
+        settings = _options(check_for_existing_series_toggle=True)
+        selected = (chapter,)
+    original = chapter.path.read_bytes()
+    sidecar = chapter.path.with_suffix(".png")
+    picture = _png("red")
+    sidecar.write_bytes(picture)
+    before = _tree(roots[0].path.parent)
+
+    result = _run(roots, selected, apply=True, options=settings, chapter_support_toggle=chapter_support)
+
+    assert (result.exit_code, result.committed) == (0, int(chapter_support))
+    if not chapter_support:
+        assert _tree(roots[0].path.parent) == before
+        assert chapter.path.read_bytes() == original
+        assert sidecar.read_bytes() == picture
+        if consumer != "duplicates":
+            assert not target.exists()
+    else:
+        assert not chapter.path.exists() and not sidecar.exists()
+        with zipfile.ZipFile(target) as archive:
+            assert archive.read("pages/page.txt") == (
+                b"preferred chapter" if consumer == "duplicates" else b"chapter input"
+            )
+        retained = _retained_groups(result, roots[0].path.parent / "state")
+        assert retained[chapter.path] == original
+        assert retained[sidecar] == picture
+        if consumer != "duplicates":
+            assert target.with_suffix(".png").read_bytes() == picture
+
+
+@pytest.mark.parametrize("chapter_support", [False, True], ids=["disabled", "enabled"])
+def test_unacceptable_cleanup_retains_disabled_chapters_but_filters_volumes(
+    roots: tuple[LibraryRoot, ...], chapter_support: bool,
+) -> None:
+    chapter = _book(roots[0], "Chapters/Series c001 [bad].cbz", b"tagged chapter")
+    volume = _book(roots[0], "Volumes/Series v01 [bad].cbz", b"tagged volume")
+    chapter_bytes, volume_bytes = chapter.path.read_bytes(), volume.path.read_bytes()
+
+    result = _run(
+        roots, (), apply=True, options=_options(delete_unacceptable_files_toggle=True),
+        chapter_support_toggle=chapter_support, unacceptable_keywords=[r"\[bad\]"],
+    )
+
+    assert (result.exit_code, result.committed) == (0, 2 if chapter_support else 1)
+    assert not volume.path.exists()
+    retained = _retained_groups(result, roots[0].path.parent / "state")
+    assert retained[volume.path] == volume_bytes
+    if chapter_support:
+        assert not chapter.path.exists()
+        assert retained[chapter.path] == chapter_bytes
+    else:
+        assert chapter.path.read_bytes() == chapter_bytes
+        assert chapter.path not in retained
+        with zipfile.ZipFile(chapter.path) as archive:
+            assert archive.read("pages/page.txt") == b"tagged chapter"
+
+
+@pytest.mark.parametrize("chapter_support", [False, True], ids=["disabled", "enabled"])
+def test_disabled_catalog_chapters_do_not_vote_against_volume_intake(
+    roots: tuple[LibraryRoot, ...], chapter_support: bool,
+) -> None:
+    chapter = _book(roots[1], "Series/Series c001.cbz", b"existing chapter")
+    volume = _book(roots[1], "Series/Series v01.cbz", b"existing volume")
+    incoming = _book(roots[0], "Incoming/Series v02.cbz", b"new volume")
+    originals = {release.path: release.path.read_bytes() for release in (chapter, volume, incoming)}
+    target = roots[1].path / "Series/Series v02.cbz"
+
+    result = _run(
+        roots, (incoming,), apply=True, options=_options(check_for_existing_series_toggle=True),
+        chapter_support_toggle=chapter_support,
+    )
+
+    assert (result.exit_code, result.committed) == (0, 0 if chapter_support else 1)
+    assert chapter.path.read_bytes() == originals[chapter.path]
+    assert volume.path.read_bytes() == originals[volume.path]
+    if chapter_support:
+        assert incoming.path.read_bytes() == originals[incoming.path]
+        assert not target.exists()
+        assert "no_suitable_series_folder_or_root" in {decision.reason for decision in result.decisions}
+    else:
+        assert not incoming.path.exists()
+        assert target.read_bytes() == originals[incoming.path]
+        with zipfile.ZipFile(target) as archive:
+            assert archive.read("pages/page.txt") == b"new volume"
+        assert _retained_groups(result, roots[0].path.parent / "state")[incoming.path] == originals[incoming.path]
+
+
+@pytest.mark.parametrize("exceptions", [(), (r"Extra",)], ids=["empty-protects-all", "explicit-exception"])
+def test_explicit_chapter_filter_overrides_support_without_activating_empty_exceptions(
+    roots: tuple[LibraryRoot, ...], exceptions: tuple[str, ...],
+) -> None:
+    chapter = _book(roots[0], "Incoming/Series c001.cbz", b"ordinary chapter")
+    extra = _book(roots[0], "Incoming/Series c002 Extra.cbz", b"exception chapter")
+    volume = _book(roots[0], "Incoming/Series v01.cbz", b"volume")
+    originals = {release.path: release.path.read_bytes() for release in (chapter, extra, volume)}
+    before = _tree(roots[0].path.parent)
+
+    result = _run(
+        roots, (), apply=True, options=_options(delete_chapters_from_downloads_toggle=True),
+        chapter_support_toggle=False, exception_keywords=exceptions,
+    )
+
+    assert (result.exit_code, result.committed) == (0, 1 if exceptions else 0)
+    assert extra.path.read_bytes() == originals[extra.path]
+    assert volume.path.read_bytes() == originals[volume.path]
+    if exceptions:
+        assert not chapter.path.exists()
+        assert _retained_groups(result, roots[0].path.parent / "state")[chapter.path] == originals[chapter.path]
+    else:
+        assert chapter.path.read_bytes() == originals[chapter.path]
+        assert _tree(roots[0].path.parent) == before
+
+
+@pytest.mark.parametrize("duplicates", [False, True], ids=["matching-only", "duplicate-feature"])
+def test_dual_role_downloads_are_not_existing_library_duplicate_evidence(
+    roots: tuple[LibraryRoot, ...], duplicates: bool,
+) -> None:
+    dual = LibraryRoot(roots[0].path, roles=("library", "download"))
+    selected_roots = (dual, roots[1])
+    low = _book(dual, "Series/Series v01.cbz", b"plain download")
+    high = _book(dual, "Series/Series v01 (Digital).cbz", b"digital download")
+    low_bytes, high_bytes = low.path.read_bytes(), high.path.read_bytes()
+    before = _tree(roots[0].path.parent)
+
+    result = _run(selected_roots, (), command="run", apply=True, options=_options(
+        check_for_existing_series_toggle=True, check_for_duplicate_volumes_toggle=duplicates,
+    ))
+
+    assert (result.exit_code, result.committed) == (0, int(duplicates))
+    assert high.path.read_bytes() == high_bytes
+    with zipfile.ZipFile(high.path) as archive:
+        assert archive.read("pages/page.txt") == b"digital download"
+    if duplicates:
+        assert not low.path.exists()
+        assert _retained_groups(result, roots[0].path.parent / "state")[low.path] == low_bytes
+    else:
+        assert low.path.read_bytes() == low_bytes
+        assert _tree(roots[0].path.parent) == before
+
+
+@pytest.mark.parametrize("ignored_at", ["root", "ancestor", "descendant"])
+def test_ignored_folder_components_bound_actual_cleanup(
+    roots: tuple[LibraryRoot, ...], ignored_at: str,
+) -> None:
+    if ignored_at == "descendant":
+        selected_roots = roots
+        protected = _book(roots[0], "Excluded/Series v01 [bad].cbz", b"excluded book")
+    else:
+        excluded_path = roots[0].path.parent / ("Excluded" if ignored_at == "root" else "Excluded/books")
+        excluded_root = LibraryRoot(excluded_path, roles=("download",))
+        selected_roots = (*roots, excluded_root)
+        protected = _book(excluded_root, "Series v01 [bad].cbz", b"excluded book")
+    filtered = _book(roots[0], "Series v02 [bad].cbz", b"eligible book")
+    protected_bytes, filtered_bytes = protected.path.read_bytes(), filtered.path.read_bytes()
+
+    result = _run(
+        selected_roots, (), apply=True, options=_options(delete_unacceptable_files_toggle=True),
+        unacceptable_keywords=[r"\[bad\]"], ignored_folder_names=["Excluded"],
+    )
+
+    assert (result.exit_code, result.committed) == (0, 1)
+    assert protected.path.read_bytes() == protected_bytes
+    with zipfile.ZipFile(protected.path) as archive:
+        assert archive.read("pages/page.txt") == b"excluded book"
+    assert not filtered.path.exists()
+    retained = _retained_groups(result, roots[0].path.parent / "state")
+    assert retained[filtered.path] == filtered_bytes
+    assert protected.path not in retained
+
+
+def test_primary_folder_match_intakes_without_filename_alias_ambiguity(roots) -> None:
+    existing = _book(roots[1], "Series/Series v01.cbz", b"existing series")
+    collection = _book(roots[1], "Other Collection/Series v03.cbz", b"collection member")
+    incoming = _book(roots[0], "Incoming/Series v02.cbz", b"new series release")
+    originals = {release.path: release.path.read_bytes() for release in (existing, collection, incoming)}
+
+    result = _run(roots, (incoming,), apply=True, options=_options(check_for_existing_series_toggle=True))
+
+    assert (result.exit_code, result.committed) == (0, 1)
+    target = roots[1].path / "Series/Series v02.cbz"
+    assert target.read_bytes() == originals[incoming.path]
+    with zipfile.ZipFile(target) as archive:
+        assert archive.read("pages/page.txt") == b"new series release"
+    assert existing.path.read_bytes() == originals[existing.path]
+    assert collection.path.read_bytes() == originals[collection.path]
+    assert not incoming.path.exists()
+    assert not (collection.parent / incoming.name).exists()
+    assert _retained_groups(result, roots[0].path.parent / "state")[incoming.path] == originals[incoming.path]
+
+
+@pytest.mark.parametrize("grouping", [False, True], ids=["root-left-alone", "group-then-match"])
+def test_root_level_matching_requires_actual_prior_grouping(
+    roots: tuple[LibraryRoot, ...], grouping: bool,
+) -> None:
+    existing = _book(roots[1], "Series/Series v01.cbz", b"existing series")
+    incoming = _book(roots[0], "Series v02.cbz", b"root-level download")
+    incoming_bytes = incoming.path.read_bytes()
+    existing_bytes = existing.path.read_bytes()
+    before = _tree(roots[0].path.parent)
+    target = roots[1].path / "Series/Series v02.cbz"
+
+    result = _run(roots, (incoming,), apply=True, options=_options(
+        create_folders_for_items_in_download_folder_toggle=grouping,
+        check_for_existing_series_toggle=True,
+    ))
+
+    assert (result.exit_code, result.committed) == (0, int(grouping))
+    assert existing.path.read_bytes() == existing_bytes
+    if grouping:
+        assert not incoming.path.exists()
+        assert target.read_bytes() == incoming_bytes
+        with zipfile.ZipFile(target) as archive:
+            assert archive.read("pages/page.txt") == b"root-level download"
+        assert _retained_groups(result, roots[0].path.parent / "state")[incoming.path] == incoming_bytes
+        assert not (roots[0].path / "Series/Series v02.cbz").exists()
+    else:
+        assert incoming.path.read_bytes() == incoming_bytes
+        assert not target.exists()
+        assert _tree(roots[0].path.parent) == before
+
+
+@pytest.mark.parametrize("evidence", ["cover", "identifier"])
+@pytest.mark.parametrize("strict_upgrade", [False, True], ids=["equal-rank-review", "higher-rank-upgrade"])
+def test_unique_archive_evidence_authorizes_only_a_strict_same_number_upgrade(
+    roots: tuple[LibraryRoot, ...], evidence: str, strict_upgrade: bool,
+) -> None:
+    image = pytest.importorskip("PIL.Image", reason="real cover evidence requires raster fixtures")
+    if evidence == "cover":
+        pytest.importorskip("cv2", reason="real cover evidence requires image similarity")
+        pytest.importorskip("skimage", reason="real cover evidence requires image similarity")
+    picture = image.new("RGB", (32, 48), "white")
+    for y in range(48):
+        for x in range(32):
+            picture.putpixel((x, y), (30 + x * 6, 20 + y * 4, (x * 17 + y * 13) % 256))
+    encoded = io.BytesIO()
+    picture.save(encoded, "PNG")
+    existing = _book(roots[1], "Dragon Lore/Dragon Lore v01.cbz", b"old book")
+    incoming = _book(
+        roots[0], f"Incoming/Dragon Lorey v01 ({'Digital' if strict_upgrade else 'Other'}).cbz", b"new book",
+    )
+    for release in (existing, incoming):
+        with zipfile.ZipFile(release.path, "a") as archive:
+            archive.writestr("01.png", encoded.getvalue())
+            if evidence == "identifier":
+                archive.comment = b"Identifiers: 12345"
+    old_bytes, new_bytes = existing.path.read_bytes(), incoming.path.read_bytes()
+    assert old_bytes != new_bytes
+    before = _tree(roots[0].path.parent)
+    settings = _options(check_for_existing_series_toggle=True)
+
+    result = _run(
+        roots, (incoming,), apply=True, options=settings,
+        match_through_image_similarity=evidence == "cover", match_through_identifiers=evidence == "identifier",
+    )
+
+    matched = next(decision for decision in result.decisions if decision.reason == "series_match")
+    assert f"evidence={'cover_similarity_match' if evidence == 'cover' else 'unique_identifier_match'}" in matched.candidates
+    if evidence == "cover":
+        assert "score=1.0" in matched.candidates
+    if not strict_upgrade:
+        assert (result.exit_code, result.committed) == (3, 0)
+        assert "duplicate_choice_required" in {decision.reason for decision in result.decisions}
+        assert existing.path.read_bytes() == old_bytes
+        assert incoming.path.read_bytes() == new_bytes
+        assert _tree(roots[0].path.parent) == before
+    else:
+        assert (result.exit_code, result.committed) == (0, 1)
+        target = roots[1].path / "Dragon Lore/Dragon Lorey v01 (Digital).cbz"
+        assert target.read_bytes() == new_bytes
+        with zipfile.ZipFile(target) as archive:
+            assert archive.read("pages/page.txt") == b"new book"
+        assert not existing.path.exists() and not incoming.path.exists()
+        assert not any(target.with_suffix(suffix).exists() for suffix in (".jpg", ".png", ".webp"))
+        retained = _retained_groups(result, roots[0].path.parent / "state")
+        assert retained[existing.path] == old_bytes
+        assert retained[incoming.path] == new_bytes
+        repeated = _run(
+            roots, (), apply=True, options=settings,
+            match_through_image_similarity=evidence == "cover", match_through_identifiers=evidence == "identifier",
+        )
+        assert (repeated.exit_code, repeated.planned, repeated.committed) == (0, 0, 0)
+        assert target.read_bytes() == new_bytes
+
+
+@pytest.mark.parametrize("readiness", ["ordinary", "empty", "stale", "current"])
+def test_download_mutation_requires_the_exact_ready_fingerprint_when_context_is_supplied(
+    roots: tuple[LibraryRoot, ...], readiness: str,
+) -> None:
+    book = _book(roots[0], "Incoming/Series Volume 1.cbz", b"ready book")
+    ready = book.observation.fingerprint
+    assert ready is not None
+    if readiness == "stale":
+        with zipfile.ZipFile(book.path, "a") as archive:
+            archive.writestr("later.txt", b"writer resumed after readiness")
+    original = book.path.read_bytes()
+    context = None if readiness == "ordinary" else () if readiness == "empty" else (ready,)
+    before = _tree(roots[0].path.parent)
+
+    result = _run(
+        roots, (book,), apply=True, ready_downloads=context,
+        options=_options(rename_files_in_download_folders_toggle=True),
+    )
+
+    target = roots[0].path / "Incoming/Series v01.cbz"
+    if readiness in {"ordinary", "current"}:
+        assert (result.exit_code, result.committed) == (0, 1)
+        assert not book.path.exists()
+        assert target.read_bytes() == original
+        with zipfile.ZipFile(target) as archive:
+            assert archive.read("pages/page.txt") == b"ready book"
+        assert _retained_groups(result, roots[0].path.parent / "state")[book.path] == original
+    else:
+        assert (result.exit_code, result.committed) == (0, 0)
+        assert book.path.read_bytes() == original
+        assert not target.exists()
+        assert _tree(roots[0].path.parent) == before
+
+
+def test_ready_scan_noop_does_not_rank_or_revalidate_a_growing_unready_digital_peer(roots) -> None:
+    scan = _book(roots[0], "Series/Series v01 (Scan).cbz", b"settled scan")
+    digital = _book(roots[0], "Series/Series v01 (Digital).cbz", b"unfinished digital")
+    files, directories = observe_organization_files(roots, (), Event())
+    with zipfile.ZipFile(digital.path, "a") as archive:
+        archive.writestr("completion.txt", b"digital now complete")
+    scan_bytes, digital_bytes = scan.path.read_bytes(), digital.path.read_bytes()
+    before = _tree(roots[0].path.parent)
+    settings = _options(check_for_duplicate_volumes_toggle=True)
+
+    waiting = workflow.organize_group(
+        (scan,), _catalog(roots, scan, digital), roots=roots, parsing=PARSING, renaming=RENAMING,
+        matching=MATCHING, ranking=RANKING, options=settings, state_dir=roots[0].path.parent / "state",
+        policy_version="ready-duplicates", authorization=RunAuthorization(apply=True), cancel=Event(),
+        files=files, directories=directories, scope_sources=frozenset(files), ready_downloads=(files[scan.path],),
+    )
+
+    assert (waiting.exit_code, waiting.planned, waiting.committed) == (0, 0, 0)
+    assert ("observed", "watch_candidate_not_ready", digital.path) in {
+        (decision.status, decision.reason, decision.path) for decision in waiting.decisions
+    }
+    assert scan.path.read_bytes() == scan_bytes
+    assert digital.path.read_bytes() == digital_bytes
+    assert _tree(roots[0].path.parent) == before
+    ready = (fingerprint(scan.path, roots[0].path), fingerprint(digital.path, roots[0].path))
+
+    completed = _run(roots, (digital,), apply=True, options=settings, ready_downloads=ready)
+
+    assert (completed.exit_code, completed.committed) == (0, 1)
+    assert not scan.path.exists()
+    assert digital.path.read_bytes() == digital_bytes
+    with zipfile.ZipFile(digital.path) as archive:
+        assert archive.read("completion.txt") == b"digital now complete"
+    assert _retained_groups(completed, roots[0].path.parent / "state")[scan.path] == scan_bytes
+
+
+@pytest.mark.parametrize("roles", [("library",), ("library", "download")], ids=["library-only", "dual-role"])
+def test_empty_ready_context_withholds_download_authority_without_disabling_library_cleanup(
+    roots: tuple[LibraryRoot, ...], roles: tuple[Literal["library", "download"], ...],
+) -> None:
+    root = LibraryRoot(roots[0].path, roles=roles)
+    selected_roots = (root, roots[1])
+    scan = _book(root, "Series/Series v01 (Scan).cbz", b"library scan")
+    digital = _book(root, "Series/Series v01 (Digital).cbz", b"library digital")
+    scan_bytes, digital_bytes = scan.path.read_bytes(), digital.path.read_bytes()
+    before = _tree(root.path.parent)
+
+    result = _run(selected_roots, (scan, digital), apply=True, command="duplicates", ready_downloads=())
+
+    assert digital.path.read_bytes() == digital_bytes
+    with zipfile.ZipFile(digital.path) as archive:
+        assert archive.read("pages/page.txt") == b"library digital"
+    if roles == ("library",):
+        assert (result.exit_code, result.committed) == (0, 1)
+        assert not scan.path.exists()
+        assert _retained_groups(result, root.path.parent / "state")[scan.path] == scan_bytes
+    else:
+        assert (result.exit_code, result.committed) == (0, 0)
+        assert scan.path.read_bytes() == scan_bytes
+        assert _tree(root.path.parent) == before
+
+
+def test_requested_folder_rename_waits_for_every_actual_file_participant(roots) -> None:
+    scan = _book(roots[0], "Series [Batch]/Series v01 (Scan).cbz", b"settled scan")
+    digital = _book(roots[0], "Series [Batch]/Series v01 (Digital).cbz", b"pending digital")
+    note = scan.parent / ".notes"
+    note.write_bytes(b"hidden user note")
+    originals = {path: path.read_bytes() for path in (scan.path, digital.path, note)}
+    before = _tree(roots[0].path.parent)
+    settings = _options(rename_dirs_in_download_folder_toggle=True)
+    context: tuple[FileFingerprint, ...] = (fingerprint(scan.path, roots[0].path),)
+
+    waiting = _run(roots, (scan,), apply=True, options=settings, ready_downloads=context)
+
+    assert (waiting.exit_code, waiting.planned, waiting.committed) == (3, 0, 0)
+    deferred = next(decision for decision in waiting.decisions if decision.reason == "watch_scope_not_ready")
+    assert deferred.status == "delivery_deferred"
+    assert deferred.path == roots[0].path / "Series [Batch]"
+    assert set(deferred.candidates) == {str(digital.path), str(note)}
+    assert _tree(roots[0].path.parent) == before
+    context = tuple(fingerprint(path, roots[0].path) for path in originals)
+
+    completed = _run(roots, (scan,), apply=True, options=settings, ready_downloads=context)
+
+    assert (completed.exit_code, completed.committed) == (0, 1)
+    target = roots[0].path / "Series"
+    assert (target / "Series v01 (Scan).cbz").read_bytes() == originals[scan.path]
+    assert (target / "Series v01 (Digital).cbz").read_bytes() == originals[digital.path]
+    assert (target / ".notes").read_bytes() == b"hidden user note"
+    assert not scan.parent.exists()
+    retained = _retained_groups(completed, roots[0].path.parent / "state")
+    assert {path: retained[path] for path in originals} == originals
+
+
+@pytest.mark.parametrize("identical", [False, True], ids=["different-byte-conflict", "identical-target-waits"])
+def test_unready_rename_target_remains_visible_without_authorizing_its_cleanup(
+    roots: tuple[LibraryRoot, ...], identical: bool,
+) -> None:
+    incoming = _book(roots[0], "Incoming/Series Volume 1.cbz", b"ready incoming")
+    target = _book(roots[0], "Incoming/Series v01.cbz", b"unready target")
+    if identical:
+        target.path.write_bytes(incoming.path.read_bytes())
+    originals = {release.path: release.path.read_bytes() for release in (incoming, target)}
+    before = _tree(roots[0].path.parent)
+
+    result = _run(
+        roots, (incoming,), apply=True, options=_options(rename_files_in_download_folders_toggle=True),
+        ready_downloads=(fingerprint(incoming.path, roots[0].path),),
+    )
+
+    assert (result.exit_code, result.planned, result.committed) == (3, 0, 0)
+    assert ("watch_scope_not_ready" if identical else "multiple_planned_outputs") in {
+        decision.reason for decision in result.decisions
+    }
+    assert {path: path.read_bytes() for path in originals} == originals
+    with zipfile.ZipFile(incoming.path) as archive:
+        assert archive.read("pages/page.txt") == b"ready incoming"
+    assert _tree(roots[0].path.parent) == before
+
+
+@pytest.mark.parametrize("sidecar_ready", [False, True], ids=["sidecar-pending", "whole-group-ready"])
+def test_upgrade_does_not_retire_the_library_book_before_incoming_sidecar_readiness(
+    roots: tuple[LibraryRoot, ...], sidecar_ready: bool,
+) -> None:
+    existing = _book(roots[1], "Series/Series v01.cbz", b"retained library book")
+    incoming = _book(roots[0], "Incoming/Series v01 (Digital).cbz", b"ready upgrade")
+    sidecar = incoming.path.with_suffix(".png")
+    picture = _png("blue")
+    sidecar.write_bytes(picture)
+    old_bytes, new_bytes = existing.path.read_bytes(), incoming.path.read_bytes()
+    before = _tree(roots[0].path.parent)
+    context: tuple[FileFingerprint, ...] = (fingerprint(incoming.path, roots[0].path),)
+    if sidecar_ready:
+        context += (fingerprint(sidecar, roots[0].path),)
+
+    result = _run(
+        roots, (incoming,), apply=True, options=_options(check_for_existing_series_toggle=True),
+        ready_downloads=context,
+    )
+
+    target = roots[1].path / "Series/Series v01 (Digital).cbz"
+    if not sidecar_ready:
+        assert (result.exit_code, result.planned, result.committed) == (3, 0, 0)
+        deferred = next(decision for decision in result.decisions if decision.reason == "watch_scope_not_ready")
+        assert (deferred.status, deferred.path, deferred.candidates) == (
+            "delivery_deferred", incoming.path, (str(sidecar),),
+        )
+        assert existing.path.read_bytes() == old_bytes
+        assert incoming.path.read_bytes() == new_bytes
+        assert sidecar.read_bytes() == picture
+        assert not target.exists()
+        assert _tree(roots[0].path.parent) == before
+    else:
+        assert (result.exit_code, result.committed) == (0, 1)
+        assert target.read_bytes() == new_bytes
+        assert target.with_suffix(".png").read_bytes() == picture
+        with zipfile.ZipFile(target) as archive:
+            assert archive.read("pages/page.txt") == b"ready upgrade"
+        assert not existing.path.exists() and not incoming.path.exists() and not sidecar.exists()
+        retained = _retained_groups(result, roots[0].path.parent / "state")
+        assert retained[existing.path] == old_bytes
+        assert retained[incoming.path] == new_bytes
+        assert retained[sidecar] == picture
+
+
+def test_disabled_catalog_chapter_does_not_block_the_matched_upgrade_artwork_group(roots) -> None:
+    old = _book(roots[1], "Series/Series v01 (Scan).cbz", b"old scan")
+    chapter = _book(roots[1], "Series/Series c001.cbz", b"disabled catalog chapter")
+    incoming = _book(roots[0], "Incoming/Series v01 (Digital).cbz", b"new digital")
+    old_bytes, chapter_bytes, new_bytes = (release.path.read_bytes() for release in (old, chapter, incoming))
+    cover = old.parent / "cover.png"
+    old_picture, new_picture = _png("red"), _png("blue")
+    incoming.path.with_suffix(".png").write_bytes(new_picture)
+    seeded = TransactionExecutor(roots[0].path.parent / "state", tuple(root.path for root in roots)).apply(
+        OperationPlan("initial-artwork", "chapter-catalog-owned-artwork", (
+            Operation("cover", "publish", cover, source=old.observation.fingerprint,
+                      artifact=ArtifactSpec(content=old_picture, media_type="image/png")),
+        ), tuple(RootPermission(root.path) for root in roots)),
+        authorization=RunAuthorization(apply=True),
+    )
+    assert seeded.committed == 1
+
+    result = _run(
+        roots, (incoming,), apply=True, options=_options(check_for_existing_series_toggle=True),
+        chapter_support_toggle=False,
+    )
+
+    assert (result.exit_code, result.committed) == (0, 1)
+    target = roots[1].path / "Series/Series v01 (Digital).cbz"
+    assert target.read_bytes() == new_bytes
+    assert target.with_suffix(".png").read_bytes() == new_picture
+    assert cover.read_bytes() == new_picture
+    assert chapter.path.read_bytes() == chapter_bytes
+    with zipfile.ZipFile(chapter.path) as archive:
+        assert archive.read("pages/page.txt") == b"disabled catalog chapter"
+    assert not old.path.exists() and not incoming.path.exists()
+    retained = _retained_groups(result, roots[0].path.parent / "state")
+    assert retained[old.path] == old_bytes and retained[incoming.path] == new_bytes
+    members = StateStore(roots[0].path.parent / "state").list_members(_report(result)["operation_id"])
+    prior_cover = next(member.backup_path for member in members if member.destination == cover)
+    assert prior_cover is not None and prior_cover.read_bytes() == old_picture
+
+
+@pytest.mark.parametrize("command", ("duplicates", "run"))
+def test_owned_download_series_art_waits_for_its_exact_ready_fingerprint(
+    roots: tuple[LibraryRoot, ...], command: str,
+) -> None:
+    scan = _book(roots[0], "Series/Series v01 (Scan).cbz", b"ready scan")
+    digital = _book(roots[0], "Series/Series v01 (Digital).cbz", b"ready upgrade")
+    scan_bytes, digital_bytes = scan.path.read_bytes(), digital.path.read_bytes()
+    old_image, new_image = _png("red"), _png("blue")
+    cover = scan.parent / "cover.png"
+    sidecar = digital.path.with_suffix(".png")
+    sidecar.write_bytes(new_image)
+    state_dir = roots[0].path.parent / "state"
+    seeded = TransactionExecutor(state_dir, tuple(root.path for root in roots)).apply(
+        OperationPlan("owned-cover-readiness", "seed-owned-cover-readiness", (
+            Operation("cover", "publish", cover, source=scan.observation.fingerprint,
+                      artifact=ArtifactSpec(content=old_image, media_type="image/png")),
+        ), tuple(RootPermission(root.path) for root in roots)),
+        authorization=RunAuthorization(apply=True),
+    )
+    assert seeded.committed == 1
+    context = tuple(fingerprint(path, roots[0].path) for path in (scan.path, digital.path, sidecar))
+    before = tuple(_tree(root.path) for root in roots)
+    operations_before = tuple(record.operation_id for record in StateStore(state_dir).list_operations())
+    waiting = _run(
+        roots, (digital,), apply=True, command=command,
+        options=_options(check_for_duplicate_volumes_toggle=True), ready_downloads=context,
+    )
+    assert (waiting.exit_code, waiting.planned, waiting.committed) == (3, 0, 0)
+    assert any(decision.reason == "watch_scope_not_ready" for decision in waiting.decisions)
+    assert tuple(_tree(root.path) for root in roots) == before
+    assert tuple(record.operation_id for record in StateStore(state_dir).list_operations()) == operations_before
+    complete = _run(
+        roots, (digital,), apply=True, command=command,
+        options=_options(check_for_duplicate_volumes_toggle=True),
+        ready_downloads=(*context, fingerprint(cover, roots[0].path)),
+    )
+    assert (complete.exit_code, complete.committed, complete.failed) == (0, 1, 0)
+    assert not scan.path.exists() and digital.path.read_bytes() == digital_bytes
+    assert sidecar.read_bytes() == new_image and cover.read_bytes() == new_image
+    retained = _retained_groups(complete, state_dir)
+    assert retained[scan.path] == scan_bytes
+    backups = [member.backup_path for report in complete.plan_reports
+               for member in StateStore(state_dir).list_members(report.operation_id)
+               if member.destination == cover and member.backup_path is not None]
+    assert len(backups) == 1 and backups[0].read_bytes() == old_image

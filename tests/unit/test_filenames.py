@@ -164,8 +164,8 @@ def test_one_shot_requires_explicit_root_or_sibling_observations() -> None:
     assert "classification:one_shot" in test_mode_root.provenance
 
 
-@pytest.mark.parametrize("suffix", [".png", ".PNG"])
-def test_observed_archive_pages_drive_the_85_page_and_grayscale_heuristic(suffix: str) -> None:
+@pytest.mark.parametrize(("suffix", "kind"), [(".png", "chapter"), (".PNG", "volume")])
+def test_observed_first_page_grayscale_requires_the_legacy_suffix_case(suffix: str, kind: str) -> None:
     grayscale_first = parse_release(
         FileObservation(
             path=Path("Library/One Book.cbz"),
@@ -193,7 +193,7 @@ def test_observed_archive_pages_drive_the_85_page_and_grayscale_heuristic(suffix
         ParsingPolicy(),
     )
 
-    assert grayscale_first.kind == "chapter"
+    assert grayscale_first.kind == kind
     assert grayscale_first.number.values == (Decimal("1"),)
     assert large_color_archive.kind == "volume"
 
@@ -247,6 +247,62 @@ def test_extra_marker_and_decimal_underscores_survive_rendering() -> None:
     assert extra.number.values == (Decimal("01.5"),)
     assert decimal.number.raw_tokens == ("01.10",)
     assert render_release(decimal, renderer) == "Series Volume 01.10.cbz"
+
+
+@pytest.mark.parametrize("restructure", [False, True])
+@pytest.mark.parametrize(
+    ("name", "rendered", "bounds"),
+    [
+        (
+            "Series v3-1_extra (Digital).cbz",
+            "Series Volume 01_extra-03 (Digital).cbz",
+            ("1.5", "3"),
+        ),
+        (
+            "Series v1-3_extra (Digital).cbz",
+            "Series Volume 01-03_extra (Digital).cbz",
+            ("1", "3.5"),
+        ),
+        (
+            "Series v03_10-1_extra (Digital).cbz",
+            "Series Volume 01_extra-03.10 (Digital).cbz",
+            ("1.5", "3.10"),
+        ),
+        (
+            "Series v01.01-3_extra (Digital).cbz",
+            "Series Volume 01.01-03_extra (Digital).cbz",
+            ("1.01", "3.5"),
+        ),
+        (
+            "Series v03.5-1_extra (Digital).cbz",
+            "Series Volume 01_extra-03.5 (Digital).cbz",
+            ("1.5", "3.5"),
+        ),
+    ],
+)
+def test_extra_range_roundtrip_keeps_the_marker_on_its_ordered_endpoint(
+    restructure: bool, name: str, rendered: str, bounds: tuple[str, str]
+) -> None:
+    parsing_policy = ParsingPolicy()
+    renderer = RenamePolicy(
+        preferred_volume_renaming_format="Volume ",
+        restructure_when_renaming=restructure,
+    )
+    release = parse_release(observation(name, root_role="library"), parsing_policy)
+    first = render_release(release, renderer)
+    reparsed = parse_release(observation(first, root_role="library"), parsing_policy)
+
+    assert first == rendered
+    for snapshot in (release, reparsed):
+        assert snapshot.kind == "volume"
+        assert snapshot.number.kind == "range"
+        assert snapshot.number.values == (Decimal(bounds[0]), Decimal(bounds[1]))
+        assert snapshot.number.part is None
+        assert "filename:extra_marker" in snapshot.provenance
+    assert release.number.covers(reparsed.number)
+    assert reparsed.number.covers(release.number)
+    assert render_release(reparsed, renderer) == rendered
+    assert render_release(release, renderer) == rendered
 
 
 def test_preserve_mode_render_is_idempotent_and_keeps_metadata_order() -> None:
@@ -340,3 +396,26 @@ def test_unicode_series_display_is_not_transliterated_for_matching() -> None:
 
     assert release.display_series == "Café 特別編"
     assert release.canonical_series_key != release.display_series
+
+
+def test_hidden_images_still_count_toward_the_chapter_page_threshold() -> None:
+    visible_pages = tuple(
+        ArchivePageObservation(f"{index:03}.png", False) for index in range(85)
+    )
+    visible_only = parse_release(
+        observation("Series Special.cbz", archive_pages=visible_pages), ParsingPolicy()
+    )
+    hidden_added = parse_release(
+        observation(
+            "Series Special.cbz",
+            archive_pages=(ArchivePageObservation(".hidden.png", False), *visible_pages),
+        ),
+        ParsingPolicy(),
+    )
+
+    assert visible_only.kind == "chapter"
+    assert visible_only.number.values == (Decimal("1"),)
+    assert "classification:one_shot" in visible_only.provenance
+    assert hidden_added.kind == "volume"
+    assert hidden_added.number.kind == "missing"
+    assert "classification:one_shot" not in hidden_added.provenance

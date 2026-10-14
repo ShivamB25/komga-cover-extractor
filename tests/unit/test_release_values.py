@@ -1,3 +1,4 @@
+import json
 from dataclasses import FrozenInstanceError
 from decimal import Decimal
 from pathlib import Path
@@ -49,6 +50,25 @@ def test_decimal_source_precision_and_part_are_retained() -> None:
     assert ReleaseNumber.from_dict(number.to_dict()) == number
 
 
+@pytest.mark.parametrize("part", [0, Decimal("1.5"), Decimal("1.000000000000000001")])
+def test_zero_and_fractional_parts_survive_json_without_aliasing_release_numbers(
+    part: int | Decimal,
+) -> None:
+    number = ReleaseNumber.scalar("53", part=part)
+    restored = ReleaseNumber.from_dict(json.loads(json.dumps(number.to_dict())))
+    assert restored.part == part and restored.values == (Decimal("53"),)
+    assert restored.covers(number) and number.covers(restored)
+    assert not restored.covers(ReleaseNumber.scalar("53"))
+    assert not restored.covers(ReleaseNumber.scalar("53.15"))
+    assert not restored.covers(ReleaseNumber.scalar("53", part=12))
+
+
+@pytest.mark.parametrize("part", [-1, Decimal("-0.5"), Decimal("NaN"), Decimal("Infinity")])
+def test_negative_and_nonfinite_parts_cannot_enter_release_identity(part: int | Decimal) -> None:
+    with pytest.raises(ValueError):
+        ReleaseNumber.scalar("53", part=part)
+
+
 def test_release_number_rejects_invalid_shapes_and_float_values() -> None:
     with pytest.raises(ValueError, match="exactly one"):
         ReleaseNumber("scalar", (), ())
@@ -60,8 +80,6 @@ def test_release_number_rejects_invalid_shapes_and_float_values() -> None:
         ReleaseNumber("scalar", (1.0,), ("1",))  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="floats"):
         ReleaseNumber.scalar("1").contains(1.0)  # type: ignore[arg-type]
-    with pytest.raises(ValueError, match="positive integer"):
-        ReleaseNumber.scalar("1", part=0)
 
 
 def test_coverage_and_comparison_are_explicit_for_each_kind() -> None:

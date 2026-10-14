@@ -202,7 +202,11 @@ def _observe_folder(directory: Path, roots: tuple[LibraryRoot, ...], parsing: Pa
                                       archive_pages=prior.observation.archive_pages if prior else (),
                                       root_role=_role(root), fingerprint=observed, at_configured_root=directory == root.path)
         try:
-            releases.append(parse_release(observation, parsing))
+            if (prior is not None and observed is not None and prior.observation.fingerprint == observed
+                    and "archive:observed" in prior.provenance and not observation.archive_pages):
+                releases.append(replace(prior, observation=observation))
+            else:
+                releases.append(parse_release(observation, parsing))
         except ValueError:
             errors.append(Decision("invalid_input", "invalid_release_observation", path))
             if prior is not None:
@@ -242,7 +246,8 @@ def _choose_series_source(folder: _Folder, catalog: LibrarySnapshot, roots: tupl
         raise _ArtworkError("missing_dependency", catalog.reason or "library_unavailable", folder.directory)
     # This is a name-only volume-folder probe, not a chapter upgrade decision.
     incoming = replace(folder.releases[0], kind="volume", number=ReleaseNumber.missing(), identifiers=())
-    volumes = tuple(release for release in catalog.releases if release.kind == "volume")
+    volumes = tuple(release for release in catalog.releases if release.kind == "volume"
+                    and release.observation.root_role in {"library", "both"})
     matched = match_series(incoming, LibrarySnapshot(volumes, roots), matching)
     if matched.status != "matched" or matched.selected is None:
         status: Literal["ambiguous", "no_match"] = "ambiguous" if matched.status == "ambiguous" else "no_match"
@@ -378,7 +383,10 @@ def _load_source(release: ReleaseSnapshot, folder: _Folder, existing: tuple[_Obs
         raise _ArtworkError("cancelled", "shutdown_requested", release.path)
     if fingerprint(release.path, folder.root.path) != source:
         raise _ArtworkError("stale_plan", "source_fingerprint_changed", release.path)
-    current = [image for image in existing if image.current_for(release, policy.generation_fingerprint, store)]
+    if release.kind == "chapter" and not (policy.chapter_support_toggle and policy.extract_chapter_covers):
+        return _SourceImage(release, None, (Decision("no_match", "chapter_cover_disabled", release.path),))
+    archive_observed = bool(release.observation.archive_pages) or "archive:observed" in release.provenance
+    current = [image for image in existing if image.current_for(release, policy.generation_fingerprint, store)] if archive_observed else []
     if len(current) == 1 and all(image.image.sha256 == current[0].image.sha256 or image.image.generated for image in existing):
         return _SourceImage(release, current[0].image)
     result = extract_cover(release.path, root=folder.root.path, policy=policy, output=FileOutputPolicy(),
@@ -390,6 +398,8 @@ def _load_source(release: ReleaseSnapshot, folder: _Folder, existing: tuple[_Obs
     observation = replace(release.observation, metadata=result.metadata.values, archive_pages=result.archive_pages)
     release = parse_release(observation, parsing)
     diagnostics = tuple(Decision("observed", reason, release.path) for reason in result.diagnostics)
+    if release.kind == "chapter" and not (policy.chapter_support_toggle and policy.extract_chapter_covers):
+        return _SourceImage(release, None, diagnostics + (Decision("no_match", "chapter_cover_disabled", release.path),))
     if result.status == "absent":
         return _SourceImage(release, None, diagnostics + (Decision("no_match", result.reason, release.path),))
     if result.artifact is None or result.suffix is None or result.media_type is None:
@@ -576,6 +586,7 @@ def extract_artwork(
     parsing: ParsingPolicy, cover_policy: CoverPolicy, series_policy: SeriesCoverPolicy,
     state_dir: Path, policy_version: str, authorization: RunAuthorization, cancel: Event,
     classification: ClassificationPolicy,
+    matching: MatchingPolicy | None = None,
     interactive: bool = False,
 ) -> RunResult:
     """Preview or apply the same concrete groups without retaining encoded batches."""
@@ -590,10 +601,9 @@ def extract_artwork(
     errors: dict[Path, Decision] = {}
     strategies: dict[Path, _SeriesSource] = {}
     diagnostics: list[Decision] = []
-    name_matching = MatchingPolicy(
-        required_similarity_score=1.0, required_matching_percentage=100.0,
-        match_through_image_similarity=False, match_through_identifiers=False,
-        classification=classification,
+    name_matching = replace(
+        matching or MatchingPolicy(), match_through_image_similarity=False,
+        match_through_identifiers=False, classification=classification,
     )
     for directory in sorted({release.parent for release in selected_by_path.values()}):
         try:
