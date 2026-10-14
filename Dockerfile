@@ -1,68 +1,53 @@
-# Use a specific version of the Python image
-FROM python:3.13.8-slim-bookworm
+FROM python:3.14-slim-bookworm@sha256:48b13b003dda20b16f9442b8475aa05fe21bf6579a8c881db92ffb4d8fd20f83 AS wheel
 
-# Set the working directory to /app
-WORKDIR /app
+ARG MANGA_ISBN=false
+ARG EPUB_CONVERTER=false
+WORKDIR /build
+RUN case "$MANGA_ISBN" in \
+      false|'') ;; \
+      true) printf '%s\n' 'MANGA_ISBN=true requires the original licensed addons/manga_isbn source, Chrome .deb and vendored python-anilist assets. They are absent from this checkout.' >&2; exit 2 ;; \
+      *) printf '%s\n' 'MANGA_ISBN must be true or false.' >&2; exit 2 ;; \
+    esac \
+    && case "$EPUB_CONVERTER" in \
+      false|'') ;; \
+      true) printf '%s\n' 'EPUB_CONVERTER=true requires the original addons/epub_converter source and requirements.txt. They are absent from this checkout.' >&2; exit 2 ;; \
+      *) printf '%s\n' 'EPUB_CONVERTER must be true or false.' >&2; exit 2 ;; \
+    esac
+COPY pyproject.toml uv.lock .python-version LICENSE.md blank_black.png blank_white.jpg ./
+COPY src/ ./src/
+RUN python -m pip install --no-cache-dir uv==0.11.32 \
+    && uv export --locked --only-group dev --no-emit-project --format requirements.txt --output-file /tmp/build-requirements.txt \
+    && uv pip install --system --require-hashes --requirement /tmp/build-requirements.txt \
+    && uv build --python /usr/local/bin/python --wheel --no-build-isolation --out-dir /dist \
+    && uv export --locked --extra all --no-default-groups --no-emit-project --no-editable --format requirements.txt --output-file /dist/requirements.txt
 
-# Create a new user called "appuser"
-RUN useradd -m appuser
+FROM python:3.14-slim-bookworm@sha256:48b13b003dda20b16f9442b8475aa05fe21bf6579a8c881db92ffb4d8fd20f83
 
-# Set the default environment variables
 ARG PUID=1000
 ARG PGID=1000
-
-# To avoid partial output in logs
-ENV PYTHONUNBUFFERED=1
-
-# Set ownership to appuser and switch to "appuser"
-RUN groupmod -o -g "$PGID" appuser && usermod -o -u "$PUID" appuser
-
-# Allow users to specify UMASK (default value is 022)
-ENV UMASK=022
-RUN umask "$UMASK"
-
-# Copy the current directory contents into the container at /app
-COPY --chown=appuser:appuser . .
-
-# Add non-free to sources.list
-RUN echo "deb http://deb.debian.org/debian bookworm non-free" >> /etc/apt/sources.list
-
-# Install necessary packages and requirements for the main script
-RUN apt-get update
-RUN apt-get install -y unrar tzdata nano build-essential
-RUN pip3 install --no-cache-dir -r requirements.txt
-
-# Install the requirements for the qbit_torrent_unchecker addon
-RUN pip3 install --no-cache-dir -r /app/addons/qbit_torrent_unchecker/requirements.txt
-
-# # Install the optional addon feature manga_isbn if true
-ARG MANGA_ISBN
-RUN if [ "$MANGA_ISBN" = "true" ]; then \
-    apt-get update && \
-    apt-get install -y wget && \
-    apt-get install -y xdg-utils libxcb-cursor0 libxcb-xinerama0 xz-utils libopengl0 libegl1 && \
-    wget -nv -O- https://download.calibre-ebook.com/linux-installer.sh | sh /dev/stdin && \
-    apt-get install -y libicu-dev pkg-config python3-icu && \
-    apt-get install -y /app/addons/manga_isbn/chrome/google-chrome-stable_current_amd64.deb && \
-    apt-get install -y python3-pyqt5 && \
-    apt-get -y install tesseract-ocr && \
-    pip3 install --no-cache-dir -r /app/addons/manga_isbn/requirements.txt && \
-    pip3 install /app/addons/manga_isbn/python-anilist-1.0.9/.; \
-    fi
-
-# # Install the optional addon feature epub_converter if true
-ARG EPUB_CONVERTER
-RUN if [ "$EPUB_CONVERTER" = "true" ]; then \
-    apt-get install -y zip && \
-    pip3 install --no-cache-dir -r /app/addons/epub_converter/requirements.txt; \
-    fi
-
-# Remove unnecessary packages and clean up
-RUN apt-get autoremove -y
-RUN rm -rf /var/lib/apt/lists/*
-
-# Switch to "appuser"
+ENV PYTHONUNBUFFERED=1 \
+    UMASK=022 \
+    HOME=/home/appuser \
+    XDG_STATE_HOME=/state
+WORKDIR /app
+RUN printf '%s\n' 'deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] http://deb.debian.org/debian bookworm non-free' > /etc/apt/sources.list.d/kce-non-free.list \
+    && apt-get update \
+    && apt-get install --yes --no-install-recommends unrar tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && case "$PUID:$PGID" in *[!0-9:]*|:*|*:) printf '%s\n' 'PUID and PGID must be positive numeric build arguments.' >&2; exit 2 ;; esac \
+    && test "$PUID" -gt 0 && test "$PGID" -gt 0 \
+    && groupadd --non-unique --gid "$PGID" appuser \
+    && useradd --non-unique --create-home --uid "$PUID" --gid appuser appuser \
+    && install --directory --owner=appuser --group=appuser /app /books /config /state
+COPY --from=wheel /dist/*.whl /dist/requirements.txt /opt/kce-distribution/
+RUN python -m pip install --no-cache-dir --require-hashes --requirement /opt/kce-distribution/requirements.txt \
+    && set -- /opt/kce-distribution/*.whl \
+    && test "$#" -eq 1 \
+    && python -m pip install --no-cache-dir --no-deps "$1[all]" \
+    && rm -rf /opt/kce-distribution
+COPY --chown=appuser:appuser LICENSE.md komga_cover_extractor.py /app/
+COPY --chown=appuser:appuser addons/qbit_torrent_unchecker/qbit_torrent_unchecker.py /app/addons/qbit_torrent_unchecker/
+COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 USER appuser
-
-# Run the addon script in the background and redirect the output to a log file, then run the main script in the foreground.
-CMD python3 /app/addons/qbit_torrent_unchecker/qbit_torrent_unchecker.py --paths="$PATHS" --download_folders="$DOWNLOAD_FOLDERS" > /dev/null 2>&1 & python3 -u komga_cover_extractor.py --paths="$PATHS" --download_folders="$DOWNLOAD_FOLDERS" --webhook="$WEBHOOK" --bookwalker_check="$BOOKWALKER_CHECK" --compress="$COMPRESS" --compress_quality="$COMPRESS_QUALITY" --bookwalker_webhook_urls="$BOOKWALKER_WEBHOOK_URLS" --watchdog="$WATCHDOG" --watchdog_discover_new_files_check_interval="$WATCHDOG_DISCOVER_NEW_FILES_CHECK_INTERVAL" --watchdog_file_transferred_check_interval="$WATCHDOG_FILE_TRANSFERRED_CHECK_INTERVAL" --output_covers_as_webp="$OUTPUT_COVERS_AS_WEBP" --new_volume_webhook="$NEW_VOLUME_WEBHOOK"
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["kce", "serve"]

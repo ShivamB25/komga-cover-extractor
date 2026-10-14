@@ -1,52 +1,115 @@
-name: Build and Push Docker Image to Docker Hub
+name: Build and verify deployment
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [master]
   pull_request:
-    branches: [ "master" ]
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
-  # Use docker.io for Docker Hub if empty
   REGISTRY: docker.io
-  # Dynamically set IMAGE_NAME using github.repository
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
+  verify-and-build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v3
-      - name: Build the Docker image
-        run: docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} .
-  
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.11.32'
+          enable-cache: true
+      - name: Install native offline-test prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes unrar iproute2
+      - name: Verify application and installed distributions
+        run: sh tools/verify_deployment.sh "$RUNNER_TEMP/kce-proof"
+      - name: Build the image only after application gates
+        env:
+          TESTED_IMAGE: kce-tested:${{ github.sha }}
+        run: docker build --tag "$TESTED_IMAGE" .
+      - name: Prove the installed container with no network
+        env:
+          TESTED_IMAGE: kce-tested:${{ github.sha }}
+        run: uv run --locked --no-sync python tools/verify_container.py "$TESTED_IMAGE" > "$RUNNER_TEMP/kce-proof/container-proof.log"
+      - name: Export the exact tested image
+        env:
+          TESTED_IMAGE: kce-tested:${{ github.sha }}
+        run: |
+          mkdir "$RUNNER_TEMP/kce-tested-image"
+          docker save --output "$RUNNER_TEMP/kce-tested-image/tested-image.tar" "$TESTED_IMAGE"
+          cd "$RUNNER_TEMP/kce-tested-image"
+          sha256sum tested-image.tar > tested-image.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tested-image-${{ github.sha }}
+          path: ${{ runner.temp }}/kce-tested-image/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Retain proof reports and distributions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-proof-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/kce-proof/*.json
+            ${{ runner.temp }}/kce-proof/*.xml
+            ${{ runner.temp }}/kce-proof/*.log
+            ${{ runner.temp }}/kce-proof/dist/*
+          if-no-files-found: ignore
+          retention-days: 7
+
   push_to_registry:
-    name: Push Docker image to Docker Hub
-    runs-on: ubuntu-latest
+    name: Publish tested Docker Hub artifact
+    needs: verify-and-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
+      - uses: actions/download-artifact@v4
+        with:
+          name: tested-image-${{ github.sha }}
+          path: tested-image
+      - name: Load only the verified image artifact
+        run: |
+          cd tested-image
+          sha256sum --check tested-image.sha256
+          docker load --input tested-image.tar
       - name: Log in to Docker Hub
         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Select Docker Hub tags
         id: meta
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            type=raw,value=latest
+            type=ref,event=branch
+            type=sha,format=long
+      - name: Publish without rebuilding
+        env:
+          TESTED_IMAGE: kce-tested:${{ github.sha }}
+          DESTINATION_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          printf '%s\n' "$DESTINATION_TAGS" | while IFS= read -r tag; do
+            test -n "$tag"
+            docker tag "$TESTED_IMAGE" "$tag"
+            docker push "$tag"
+          done

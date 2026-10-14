@@ -1,25 +1,82 @@
-name: Deploy Images to GHCR
+name: Deploy tested image to GHCR
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: [Build and verify deployment]
+    types: [completed]
+    branches: [master]
   workflow_dispatch:
+    inputs:
+      verified_run_id:
+        description: Successful master deployment-verification run for this exact revision
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ghcr-master-publication
+  cancel-in-progress: false
 
 jobs:
-      push-store-image:
-        runs-on: ubuntu-latest
-        steps:
-          - name: 'Checkout GitHub Action'
-            uses: actions/checkout@main
-
-          - name: 'Login to GitHub Container Registry'
-            uses: docker/login-action@v1
-            with:
-              registry: ghcr.io
-              username: ${{github.actor}}
-              password: ${{secrets.GITHUB_TOKEN}}
-          - name: 'Build Inventory Image'
-            run: |
-              docker build -t ghcr.io/zachstultz/komga-cover-extractor:latest .
-              docker push ghcr.io/zachstultz/komga-cover-extractor:latest
+  push-store-image:
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'master' &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Resolve the successful tested master revision
+        id: verified
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          VERIFIED_RUN_ID: ${{ github.event.workflow_run.id || inputs.verified_run_id }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          case "$VERIFIED_RUN_ID" in ''|*[!0-9]*) printf '%s\n' 'A numeric successful verification run ID is required.' >&2; exit 2 ;; esac
+          gh api "repos/$REPOSITORY/actions/runs/$VERIFIED_RUN_ID" > verification-run.json
+          jq --exit-status --arg repository "$REPOSITORY" --arg sha "$EXPECTED_SHA" '
+            .name == "Build and verify deployment" and
+            .path == ".github/workflows/docker-hub.yml" and
+            .event == "push" and .head_branch == "master" and
+            .head_repository.full_name == $repository and
+            .conclusion == "success" and .head_sha == $sha
+          ' verification-run.json
+          printf 'run_id=%s\n' "$VERIFIED_RUN_ID" >> "$GITHUB_OUTPUT"
+          printf 'sha=%s\n' "$EXPECTED_SHA" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: tested-image-${{ steps.verified.outputs.sha }}
+          path: tested-image
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.verified.outputs.run_id }}
+      - name: Load only the verified image artifact
+        run: |
+          cd tested-image
+          sha256sum --check tested-image.sha256
+          docker load --input tested-image.tar
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish without rebuilding
+        env:
+          TESTED_IMAGE: kce-tested:${{ steps.verified.outputs.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          destination=$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          docker tag "$TESTED_IMAGE" "ghcr.io/$destination:latest"
+          docker push "ghcr.io/$destination:latest"
